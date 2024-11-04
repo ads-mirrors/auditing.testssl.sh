@@ -17237,8 +17237,8 @@ run_renego() {
           fi
           if [[ $SERVICE != HTTP ]]; then
                # theoric possible case
-               if [[ $loop_reneg -eq 2 ]];
-                    $tmp_result=0
+               if [[ $loop_reneg -eq 2 ]]; then
+                    tmp_result=0
                fi
                case $tmp_result in
                     0) pr_svrty_medium "VULNERABLE (NOT ok)"; outln ", potential DoS threat"
