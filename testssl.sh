@@ -17076,7 +17076,7 @@ run_ticketbleed() {
 #
 run_renego() {
      local legacycmd="" proto="$OPTIMAL_PROTO"
-     local sec_renego sec_client_renego
+     local sec_renego
      local -i ret=0
      local cve=""
      local cwe="CWE-310"
@@ -17168,7 +17168,6 @@ run_renego() {
      elif [[ "$CLIENT_AUTH" == required ]] && [[ -z "$MTLS" ]]; then
           prln_warning "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
           fileout "$jsonID" "WARN" "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
-          sec_client_renego=1
      else
           # We will need $ERRFILE for mitigation detection
           if [[ $ERRFILE =~ dev.null ]]; then
@@ -17179,99 +17178,91 @@ run_renego() {
           else
                restore_errfile=0
           fi
-          # We need up to two tries here, as some LiteSpeed servers don't answer on "R" and block. Thus first try in the background
-          # msg enables us to look deeper into it while debugging
-          echo R | $OPENSSL s_client $(s_client_options "$proto $BUGS $legacycmd $STARTTLS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE &
-          wait_kill $! $HEADER_MAXSLEEP
-          if [[ $? -eq 3 ]]; then
-               pr_svrty_good "likely not vulnerable (OK)"; outln ", timed out"        # it hung
-               fileout "$jsonID" "OK" "likely not vulnerable (timed out)" "$cve" "$cwe"
-               sec_client_renego=1
+          if [[ $SERVICE != HTTP ]]; then
+          # Connection could be closed by the server after one try so we will try two iteration
+          # to not close the openssl s_client STDIN too early like on the HTTP case.
+          # See https://github.com/drwetter/testssl.sh/issues/2590
+          ssl_reneg_attempts=2
+          fi
+          # We try again if server is HTTP. This could be either a node.js server or something else.
+          # Mitigations (default values) for:
+          # - node.js allows 3x R and then blocks. So then 4x should be tested.
+          # - F5 BIG-IP ADS allows 5x R and then blocks. So then 6x should be tested.
+          # - Stormshield allows 9x and then blocks. So then 10x should be tested.
+          # This way we save a couple seconds as we weeded out the ones which are more robust
+          # Amount of times tested before breaking is set in SSL_RENEG_ATTEMPTS.
+
+          # Clear the log to not get the content of previous run before the execution of the new one.
+          echo -n > $TMPFILE
+          # RENEGOTIATING wait loop watchdog file
+          touch $TEMPDIR/allowed_to_loop
+          # If we dont wait for the session to be established on slow server, we will try to re-negotiate
+          # too early losing all the attempts before the session establishment as OpenSSL will not buffer them
+          # (only the first will be till the establishement of the session).
+          (j=0; while [[ $(grep -ac '^SSL-Session:' $TMPFILE) -ne 1 ]] && [[ $j -lt 30 ]]; do sleep $ssl_reneg_wait; ((j++)); done; \
+               for ((i=0; i < ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R; k=0; \
+                   # 0 means client is renegotiating & doesn't return an error --> vuln!
+                   # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
+                   # Exemption from above: server closed the connection but return value was zero
+                   # See https://github.com/drwetter/testssl.sh/issues/1725 and referenced issue @haproxy
+                   while [[ $(grep -ac '^RENEGOTIATING' $ERRFILE) -ne $((i+1)) ]] && [[ -f $TEMPDIR/allowed_to_loop ]] \
+                         && [[ $(tail -n1 $ERRFILE |grep -acE '^(RENEGOTIATING|depth|verify|notAfter)') -eq 1 ]] \
+                         && [[ $k -lt 120 ]]; \
+                       do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then sleep 1; break; fi; done; \
+               done) | \
+               $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE &
+          pid=$!
+          ( sleep $((ssl_reneg_attempts*3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
+          watcher=$!
+          # Trick to get the return value of the openssl command, output redirection and a timeout.
+          # Yes, some target hang/block after some tries (some LiteSpeed servers don't answer at all on "R" and block).
+          wait $pid
+          tmp_result=$?
+          pkill -HUP -P $watcher
+          wait $watcher
+          rm -f $TEMPDIR/allowed_to_loop
+          # If we are here, we have done the loop
+          loop_reneg=$(grep -ac '^RENEGOTIATING' $ERRFILE)
+          # As above, some servers close the connection and return value is zero
+          if (tail -5 $TMPFILE| grep -qa '^closed'); then
+               tmp_result=1
+          fi
+          if [[ -f $TEMPDIR/was_killed ]]; then
+               tmp_result=2
+               rm -f $TEMPDIR/was_killed
+          fi
+          if [[ $SERVICE != HTTP ]]; then
+               case $tmp_result in
+                    0) pr_svrty_medium "VULNERABLE (NOT ok)"; outln ", potential DoS threat"
+                       fileout "$jsonID" "MEDIUM" "VULNERABLE, potential DoS threat" "$cve" "$cwe" "$hint"
+                       ;;
+                    1) prln_svrty_good "not vulnerable (OK)"
+                       fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
+                       ;;
+                    2) pr_svrty_good "likely not vulnerable (OK)"; outln ", timed out ($((${ssl_reneg_attempts}*3))s)"        # it hung
+                       fileout "$jsonID" "OK" "likely not vulnerable (timed out)" "$cve" "$cwe"
+                       ;;
+                    *) prln_warning "FIXME (bug): $sec_client_renego"
+                       fileout "$jsonID" "DEBUG" "FIXME (bug) $sec_client_renego - Please report" "$cve" "$cwe"
+                       ret=1
+                       ;;
+               esac 
           else
-               # second try in the foreground as we are sure now it won't hang
-               echo R | $OPENSSL s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE
-               sec_client_renego=$?
-               # 0 means client is renegotiating & doesn't return an error --> vuln!
-               # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
-               if tail -5 $TMPFILE| grep -qa '^closed'; then
-                    # Exemption from above: server closed the connection but return value was zero
-                    # See https://github.com/drwetter/testssl.sh/issues/1725 and referenced issue @haproxy
-                    sec_client_renego=1
-               fi
-               case "$sec_client_renego" in
-                    0)   # We try again if server is HTTP. This could be either a node.js server or something else.
-                         # Mitigations (default values) for:
-                         # - node.js allows 3x R and then blocks. So then 4x should be tested.
-                         # - F5 BIG-IP ADS allows 5x R and then blocks. So then 6x should be tested.
-                         # - Stormshield allows 9x and then blocks. So then 10x should be tested.
-                         # This way we save a couple seconds as we weeded out the ones which are more robust
-                         # Amount of times tested before breaking is set in SSL_RENEG_ATTEMPTS.
-                         if [[ $SERVICE != HTTP ]]; then
-                              pr_svrty_medium "VULNERABLE (NOT ok)"; outln ", potential DoS threat"
-                              fileout "$jsonID" "MEDIUM" "VULNERABLE, potential DoS threat" "$cve" "$cwe" "$hint"
-                         else
-                              # Clear the log to not get the content of previous run before the execution of the new one.
-                              echo -n > $TMPFILE
-                              #RENEGOTIATING wait loop watchdog file
-                              touch $TEMPDIR/allowed_to_loop
-                              # If we dont wait for the session to be established on slow server, we will try to re-negotiate
-                              # too early losing all the attempts before the session establishment as OpenSSL will not buffer them
-                              # (only the first will be till the establishement of the session).
-                              (j=0; while [[ $(grep -ac '^SSL-Session:' $TMPFILE) -ne 1 ]] && [[ $j -lt 30 ]]; do sleep $ssl_reneg_wait; ((j++)); done; \
-                                   for ((i=0; i < ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R; k=0; \
-                                       while [[ $(grep -ac '^RENEGOTIATING' $ERRFILE) -ne $((i+3)) ]] && [[ -f $TEMPDIR/allowed_to_loop ]] \
-                                             && [[ $(tail -n1 $ERRFILE |grep -acE '^(RENEGOTIATING|depth|verify|notAfter)') -eq 1 ]] \
-                                             && [[ $k -lt 120 ]]; \
-                                           do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then sleep 1; break; fi; done; \
-                                   done) | \
-                                   $OPENSSL s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE &
-                              pid=$!
-                              ( sleep $((ssl_reneg_attempts*3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
-                              watcher=$!
-                              # Trick to get the return value of the openssl command, output redirection and a timeout.
-                              # Yes, some target hang/block after some tries.
-                              wait $pid
-                              tmp_result=$?
-                              pkill -HUP -P $watcher
-                              wait $watcher
-                              rm -f $TEMPDIR/allowed_to_loop
-                              # If we are here, we have done two successful renegotiation (-2) and do the loop
-                              loop_reneg=$(($(grep -ac '^RENEGOTIATING' $ERRFILE)-2))
-                              # As above, some servers close the connection and return value is zero
-                              if (tail -5 $TMPFILE| grep -qa '^closed'); then
-                                   tmp_result=1
-                              fi
-                              if [[ -f $TEMPDIR/was_killed ]]; then
-                                   tmp_result=2
-                                   rm -f $TEMPDIR/was_killed
-                              fi
-                              case $tmp_result in
-                                   0) pr_svrty_high "VULNERABLE (NOT ok)"; outln ", DoS threat ($ssl_reneg_attempts attempts)"
-                                      fileout "$jsonID" "HIGH" "VULNERABLE, DoS threat" "$cve" "$cwe" "$hint"
-                                      ;;
-                                   1) pr_svrty_good "not vulnerable (OK)"; outln " -- mitigated (disconnect after $loop_reneg/$ssl_reneg_attempts attempts)"
-                                      fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
-                                      ;;
-                                   2) pr_svrty_good "not vulnerable (OK)"; \
-                                           outln " -- mitigated ($loop_reneg successful reneg within ${ssl_reneg_attempts} in $((${ssl_reneg_attempts}*3))s(timeout))"
-                                      fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
-                                      ;;
-                                   *) prln_warning "FIXME (bug): $sec_client_renego ($ssl_reneg_attempts tries)"
-                                      fileout "$jsonID" "DEBUG" "FIXME (bug $ssl_reneg_attempts tries) $sec_client_renego" "$cve" "$cwe"
-                                      ret=1
-                                      ;;
-                              esac
-                         fi
-                         ;;
-                    1)
-                         prln_svrty_good "not vulnerable (OK)"
-                         fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
-                         ;;
-                    *)
-                         prln_warning "FIXME (bug): $sec_client_renego"
-                         fileout "$jsonID" "DEBUG" "FIXME (bug) $sec_client_renego - Please report" "$cve" "$cwe"
-                         ret=1
-                         ;;
+               case $tmp_result in
+                    0) pr_svrty_high "VULNERABLE (NOT ok)"; outln ", DoS threat ($ssl_reneg_attempts attempts)"
+                       fileout "$jsonID" "HIGH" "VULNERABLE, DoS threat" "$cve" "$cwe" "$hint"
+                       ;;
+                    1) pr_svrty_good "not vulnerable (OK)"; outln " -- mitigated (disconnect after $loop_reneg/$ssl_reneg_attempts attempts)"
+                       fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
+                       ;;
+                    2) pr_svrty_good "not vulnerable (OK)"; \
+                          outln " -- mitigated ($loop_reneg successful reneg within ${ssl_reneg_attempts} in $((${ssl_reneg_attempts}*3))s(timeout))"
+                       fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
+                       ;;
+                    *) prln_warning "FIXME (bug): $sec_client_renego ($ssl_reneg_attempts tries)"
+                       fileout "$jsonID" "DEBUG" "FIXME (bug $ssl_reneg_attempts tries) $sec_client_renego" "$cve" "$cwe"
+                       ret=1
+                       ;;
                esac
           fi
      fi
@@ -20446,6 +20437,8 @@ find_openssl_binary() {
                fatal "You specified a connect or openssl timeout but the binary \"timeout\" couldn't be found " $ERR_RESOURCE
           fi
      fi
+
+     OPENSSL_NOTIMEOUT=$OPENSSL
 
      if ! "$do_mass_testing"; then
           if [[ -n $OPENSSL_TIMEOUT ]]; then
