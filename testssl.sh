@@ -17179,10 +17179,7 @@ run_renego() {
                restore_errfile=0
           fi
           if [[ $SERVICE != HTTP ]]; then
-          # Connection could be closed by the server after one try so we will try two iteration
-          # to not close the openssl s_client STDIN too early like on the HTTP case.
-          # See https://github.com/drwetter/testssl.sh/issues/2590
-          ssl_reneg_attempts=2
+          ssl_reneg_attempts=1
           fi
           # We try again if server is HTTP. This could be either a node.js server or something else.
           # Mitigations (default values) for:
@@ -17200,7 +17197,11 @@ run_renego() {
           # too early losing all the attempts before the session establishment as OpenSSL will not buffer them
           # (only the first will be till the establishement of the session).
           (j=0; while [[ $(grep -ac '^SSL-Session:' $TMPFILE) -ne 1 ]] && [[ $j -lt 30 ]]; do sleep $ssl_reneg_wait; ((j++)); done; \
-               for ((i=0; i < ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R; k=0; \
+               # Connection could be closed by the server with 0 return value. We do one more iteration to not close
+               # s_client STDIN too early as the close could come at any time and race with the tear down of s_client.
+               # See https://github.com/drwetter/testssl.sh/issues/2590
+               # In this case the added iteration is harmfull as it will just spin in backgroup
+               for ((i=0; i <= ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R; k=0; \
                    # 0 means client is renegotiating & doesn't return an error --> vuln!
                    # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
                    # Exemption from above: server closed the connection but return value was zero
@@ -17208,11 +17209,11 @@ run_renego() {
                    while [[ $(grep -ac '^RENEGOTIATING' $ERRFILE) -ne $((i+1)) ]] && [[ -f $TEMPDIR/allowed_to_loop ]] \
                          && [[ $(tail -n1 $ERRFILE |grep -acE '^(RENEGOTIATING|depth|verify|notAfter)') -eq 1 ]] \
                          && [[ $k -lt 120 ]]; \
-                       do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then sleep 1; break; fi; done; \
+                       do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then break; fi; done; \
                done) | \
                $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE &
           pid=$!
-          ( sleep $((ssl_reneg_attempts*3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
+          ( sleep $((ssl_reneg_attempts*3+3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
           watcher=$!
           # Trick to get the return value of the openssl command, output redirection and a timeout.
           # Yes, some target hang/block after some tries (some LiteSpeed servers don't answer at all on "R" and block).
@@ -17220,8 +17221,10 @@ run_renego() {
           tmp_result=$?
           pkill -HUP -P $watcher
           wait $watcher
+          # Stop any backgroud wait loop
           rm -f $TEMPDIR/allowed_to_loop
-          # If we are here, we have done the loop
+          # If we are here, we have done the loop. Count the effective renego attempts.
+          # It could be less than the numbers of "for" itterations (minus one) in case of late server close.
           loop_reneg=$(grep -ac '^RENEGOTIATING' $ERRFILE)
           # As above, some servers close the connection and return value is zero
           if (tail -5 $TMPFILE| grep -qa '^closed'); then
@@ -17239,7 +17242,7 @@ run_renego() {
                     1) prln_svrty_good "not vulnerable (OK)"
                        fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
                        ;;
-                    2) pr_svrty_good "likely not vulnerable (OK)"; outln ", timed out ($((${ssl_reneg_attempts}*3))s)"        # it hung
+                    2) pr_svrty_good "likely not vulnerable (OK)"; outln ", timed out ($((${ssl_reneg_attempts}*3+3))s)"        # it hung
                        fileout "$jsonID" "OK" "likely not vulnerable (timed out)" "$cve" "$cwe"
                        ;;
                     *) prln_warning "FIXME (bug): $sec_client_renego"
@@ -17256,7 +17259,7 @@ run_renego() {
                        fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
                        ;;
                     2) pr_svrty_good "not vulnerable (OK)"; \
-                          outln " -- mitigated ($loop_reneg successful reneg within ${ssl_reneg_attempts} in $((${ssl_reneg_attempts}*3))s(timeout))"
+                          outln " -- mitigated ($loop_reneg successful reneg within ${ssl_reneg_attempts} in $((${ssl_reneg_attempts}*3+3))s(timeout))"
                        fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
                        ;;
                     *) prln_warning "FIXME (bug): $sec_client_renego ($ssl_reneg_attempts tries)"
