@@ -17221,10 +17221,10 @@ run_renego() {
           tmp_result=$?
           pkill -HUP -P $watcher
           wait $watcher
-          # Stop any backgroud wait loop
+          # Stop any background wait loop
           rm -f $TEMPDIR/allowed_to_loop
           # If we are here, we have done the loop. Count the effective renego attempts.
-          # It could be less than the numbers of "for" itterations (minus one) in case of late server close.
+          # It could be less than the numbers of "for" iterations (minus one) in case of late server close.
           loop_reneg=$(grep -ac '^RENEGOTIATING' $ERRFILE)
           # As above, some servers close the connection and return value is zero
           if (tail -5 $TMPFILE| grep -qa '^closed'); then
