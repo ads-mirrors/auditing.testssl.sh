@@ -17172,8 +17172,6 @@ run_renego() {
           # We will need $ERRFILE for mitigation detection
           if [[ $ERRFILE =~ dev.null ]]; then
                ERRFILE=$TEMPDIR/errorfile.txt || exit $ERR_FCREATE
-               # cleanup previous run if any (multiple IP)
-               rm -f $ERRFILE
                restore_errfile=1
           else
                restore_errfile=0
@@ -17190,7 +17188,9 @@ run_renego() {
           # Amount of times tested before breaking is set in SSL_RENEG_ATTEMPTS.
 
           # Clear the log to not get the content of previous run before the execution of the new one.
+	  # (Used in the loop tests before s_client invocation)
           echo -n > $TMPFILE
+          echo -n > $ERRFILE
           # RENEGOTIATING wait loop watchdog file
           touch $TEMPDIR/allowed_to_loop
           # If we dont wait for the session to be established on slow server, we will try to re-negotiate
@@ -17211,7 +17211,7 @@ run_renego() {
                          && [[ $k -lt 120 ]]; \
                        do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then break; fi; done; \
                done) | \
-               $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>>$ERRFILE &
+               $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE &
           pid=$!
           ( sleep $((ssl_reneg_attempts*3+3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
           watcher=$!
@@ -17235,6 +17235,9 @@ run_renego() {
                tmp_result=2
                rm -f $TEMPDIR/was_killed
           fi
+          if [[ $tmp_result -eq 1 ]] && [[ loop_reneg -eq 1 ]]; then
+               tmp_result=3
+          fi
           if [[ $SERVICE != HTTP ]]; then
                # theoric possible case
                if [[ $loop_reneg -eq 2 ]]; then
@@ -17244,7 +17247,7 @@ run_renego() {
                     0) pr_svrty_medium "VULNERABLE (NOT ok)"; outln ", potential DoS threat"
                        fileout "$jsonID" "MEDIUM" "VULNERABLE, potential DoS threat" "$cve" "$cwe" "$hint"
                        ;;
-                    1) prln_svrty_good "not vulnerable (OK)"
+                    1|3) prln_svrty_good "not vulnerable (OK)"
                        fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
                        ;;
                     2) pr_svrty_good "likely not vulnerable (OK)"; outln ", timed out ($((${ssl_reneg_attempts}*3+3))s)"        # it hung
@@ -17262,6 +17265,9 @@ run_renego() {
                        ;;
                     1) pr_svrty_good "not vulnerable (OK)"; outln " -- mitigated (disconnect after $loop_reneg/$ssl_reneg_attempts attempts)"
                        fileout "$jsonID" "OK" "not vulnerable, mitigated" "$cve" "$cwe"
+                       ;;
+                    3) prln_svrty_good "not vulnerable (OK)"
+                       fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
                        ;;
                     2) pr_svrty_good "not vulnerable (OK)"; \
                           outln " -- mitigated ($loop_reneg successful reneg within ${ssl_reneg_attempts} in $((${ssl_reneg_attempts}*3+3))s(timeout))"
