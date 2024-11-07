@@ -17188,7 +17188,7 @@ run_renego() {
           # Amount of times tested before breaking is set in SSL_RENEG_ATTEMPTS.
 
           # Clear the log to not get the content of previous run before the execution of the new one.
-	  # (Used in the loop tests before s_client invocation)
+          # (Used in the loop tests before s_client invocation)
           echo -n > $TMPFILE
           echo -n > $ERRFILE
           # RENEGOTIATING wait loop watchdog file
