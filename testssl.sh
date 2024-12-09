@@ -17173,11 +17173,6 @@ run_renego() {
           prln_warning "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
           fileout "$jsonID" "WARN" "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
      else
-#          # We will extensively use subshell and command pipe
-#          # Do not let herited pipeline error control interfere
-#          [[ $- == *e* ]] && restore_pipeerror=1 
-#          [[ $restore_pipeerror == 1 ]] && set +e
-#	  set +o pipefail
           # We will need $ERRFILE for mitigation detection
           if [[ $ERRFILE =~ dev.null ]]; then
                ERRFILE=$TEMPDIR/errorfile.txt || exit $ERR_FCREATE
@@ -17288,7 +17283,6 @@ run_renego() {
                        ;;
                esac
           fi
-#          [[ $restore_pipeerror == 1 ]] && set -e
      fi
 
      #pr_bold " Insecure Client-Initiated Renegotiation  "  # pre-RFC 5746, CVE-2009-3555
