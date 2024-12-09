@@ -17173,10 +17173,11 @@ run_renego() {
           prln_warning "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
           fileout "$jsonID" "WARN" "not having provided client certificate and private key file, the client x509-based authentication prevents this from being tested"
      else
-          # We will extensively use subshell and command pipe
-          # Do not let herited pipeline error control interfere
-          [[ $- == *e* ]] && restore_pipeerror=1 
-          [[ $restore_pipeerror == 1 ]] && set +e
+#          # We will extensively use subshell and command pipe
+#          # Do not let herited pipeline error control interfere
+#          [[ $- == *e* ]] && restore_pipeerror=1 
+#          [[ $restore_pipeerror == 1 ]] && set +e
+#	  set +o pipefail
           # We will need $ERRFILE for mitigation detection
           if [[ $ERRFILE =~ dev.null ]]; then
                ERRFILE=$TEMPDIR/errorfile.txt || exit $ERR_FCREATE
@@ -17209,7 +17210,7 @@ run_renego() {
                # s_client STDIN too early as the close could come at any time and race with the tear down of s_client.
                # See https://github.com/drwetter/testssl.sh/issues/2590
                # In this case the added iteration is harmless as it will just spin in backgroup
-               for ((i=0; i <= ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R; k=0; \
+               for ((i=0; i <= ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R 2>/dev/null; k=0; \
                    # 0 means client is renegotiating & doesn't return an error --> vuln!
                    # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
                    # Exemption from above: server closed the connection but return value was zero
@@ -17287,7 +17288,7 @@ run_renego() {
                        ;;
                esac
           fi
-          [[ $restore_pipeerror == 1 ]] && set -e
+#          [[ $restore_pipeerror == 1 ]] && set -e
      fi
 
      #pr_bold " Insecure Client-Initiated Renegotiation  "  # pre-RFC 5746, CVE-2009-3555
