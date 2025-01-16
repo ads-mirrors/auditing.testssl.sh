@@ -3438,13 +3438,17 @@ run_security_headers() {
      for header_and_svrty in "X-Frame-Options OK" \
                              "X-Content-Type-Options OK" \
                              "Content-Security-Policy OK" \
-                             "X-Content-Security-Policy OK" \
-                             "X-WebKit-CSP OK" \
+                             "X-Content-Security-Policy INFO" \
+                             "X-WebKit-CSP INFO" \
                              "Content-Security-Policy-Report-Only OK" \
                              "Expect-CT OK" \
                              "Permissions-Policy OK" \
+                             "Cross-Origin-Opener-Policy INFO" \
+                             "Cross-Origin-Resource-Policy INFO" \
+                             "Cross-Origin-Embedder-Policy INFO" \
                              "X-XSS-Protection INFO" \
                              "Access-Control-Allow-Origin INFO" \
+                             "Access-Control-Allow-Credentials INFO" \
                              "Upgrade INFO" \
                              "X-Served-By INFO" \
                              "Referrer-Policy INFO" \
