@@ -10852,6 +10852,14 @@ run_fs() {
                                    "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
                               fi
                          done
+                         # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+                         # used in the certificate. The easiest solution is to move the curves to the end of the list.
+                         # instead of removing them from the ClientHello.
+                         for (( i=low; i < high; i++ )); do
+                              if ! "$HAS_TLS13" || ! "${curves_deprecated[i]}" || [[ "$proto" == "-no_tls1_3" ]]; then
+                                   "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
+                              fi
+                         done
                          [[ -z "$curves_to_test" ]] && break
                          $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                          sclient_connect_successful $? $TMPFILE || break
