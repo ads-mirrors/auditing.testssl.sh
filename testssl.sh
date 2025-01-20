@@ -10852,14 +10852,6 @@ run_fs() {
                                    "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
                               fi
                          done
-                         # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
-                         # used in the certificate. The easiest solution is to move the curves to the end of the list.
-                         # instead of removing them from the ClientHello.
-                         for (( i=low; i < high; i++ )); do
-                              if ! "$HAS_TLS13" || ! "${curves_deprecated[i]}" || [[ "$proto" == "-no_tls1_3" ]]; then
-                                   "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
-                              fi
-                         done
                          [[ -z "$curves_to_test" ]] && break
                          $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                          sclient_connect_successful $? $TMPFILE || break
@@ -10880,6 +10872,44 @@ run_fs() {
                          done
                          [[ $i -eq $high ]] && break
                          supported_curve[i]=true
+                    done
+                    while true; do
+                         # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+                         # used in the certificate. The easiest solution is to move the curves to the end of the list.
+                         # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
+                         if ((! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]) && [[ ! "$ecdhe_cipher_list" == *RSA* ]]) || break; then
+                              curves_to_test=""
+                              for (( i=low; i < high; i++ )); do
+                                   if ! "${curves_deprecated[i]}"; then
+                                        "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
+                                   fi
+                              done
+                              [[ -z "$curves_to_test" ]] && break
+                              for (( i=low; i < high; i++ )); do
+                                   if ! "${curves_deprecated[i]}"; then
+                                        "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
+                                   fi
+                              done
+                              $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
+                              sclient_connect_successful $? $TMPFILE || break
+                              temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                              curve_found="${temp%%,*}"
+                              if [[ "$curve_found" == ECDH ]]; then
+                                   curve_found="${temp#*, }"
+                                   curve_found="${curve_found%%,*}"
+                                   if "$HAS_TLS13" && [[ ! "$proto" == "-no_tls1_3" ]] && [[ "$curve_found" == brainpoolP[235][581][642]r1 ]]; then
+                                        [[ "$(get_protocol "$TMPFILE")" == TLSv1.3 ]] && curve_found+="tls13"
+                                   fi
+                              fi
+                              for (( i=low; i < high; i++ )); do
+                                   if ! "${supported_curve[i]}"; then
+                                        [[ "${curves_ossl_output[i]}" == "$curve_found" ]] && break
+                                        [[ "${curves_ossl[i]}" == "$curve_found" ]] && break
+                                   fi
+                              done
+                              [[ $i -eq $high ]] && break
+                              supported_curve[i]=true
+                         fi
                     done
                done
           done
@@ -10916,6 +10946,41 @@ run_fs() {
                     done
                     [[ $i -eq $nr_curves ]] && break
                     supported_curve[i]=true
+               done
+               # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+               # used in the certificate. The easiest solution is to move the curves to the end of the list.
+               # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
+               while true; do
+                    if ([[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]) || break; then
+                         curves_to_test=""
+                         for (( i=0; i < nr_curves; i++ )); do
+                              if ! "${curves_deprecated[i]}" || [[ "$proto" == 03 ]]; then
+                                   ! "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
+                              fi
+                         done
+                         [[ -z "$curves_to_test" ]] && break
+                         for (( i=0; i < nr_curves; i++ )); do
+                              if ! "${curves_deprecated[i]}" || [[ "$proto" == 03 ]]; then
+                                   "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
+                              fi
+                         done
+                         len1=$(printf "%02x" "$((2*${#curves_to_test}/7))")
+                         len2=$(printf "%02x" "$((2*${#curves_to_test}/7+2))")
+                         tls_sockets "$proto" "${ecdhe_cipher_list_hex:2}, 00,ff" "ephemeralkey" "00, 0a, 00, $len2, 00, $len1, ${curves_to_test:2}"
+                         sclient_success=$?
+                         [[ $sclient_success -ne 0 ]] && [[ $sclient_success -ne 2 ]] && break
+                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")
+                         curve_found="${temp%%,*}"
+                         if [[ "$curve_found" == "ECDH" ]]; then
+                              curve_found="${temp#*, }"
+                              curve_found="${curve_found%%,*}"
+                         fi
+                         for (( i=0; i < nr_curves; i++ )); do
+                              ! "${supported_curve[i]}" && [[ "${curves_ossl_output[i]}" == "$curve_found" ]] && break
+                         done
+                         [[ $i -eq $nr_curves ]] && break
+                         supported_curve[i]=true
+                    fi
                done
           done
      fi
