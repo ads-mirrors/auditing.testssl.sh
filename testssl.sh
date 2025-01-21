@@ -20354,8 +20354,8 @@ find_openssl_binary() {
      $OPENSSL s_client -tls1_3 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_TLS13=true
      $OPENSSL s_client -no_ssl2 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_SSL2=true
 
-     $OPENSSL genpkey -algorithm X448 2>&1 | grep -aq "not found" || HAS_X448=true
-     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -aq "not found" || HAS_X25519=true
+     $OPENSSL genpkey -algorithm X448 2>&1 | grep -Eaq "not found|unsupported" || HAS_X448=true
+     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -Eaq "not found|unsupported" || HAS_X25519=true
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error ||  HAS_PKUTIL=true
 
