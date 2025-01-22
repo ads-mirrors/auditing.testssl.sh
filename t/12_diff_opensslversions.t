@@ -60,8 +60,8 @@ $diff = diff \$cat_csvfile, \$cat_csvfile2;
 ok( $cat_csvfile eq $cat_csvfile2, "Check whether CSV outputs match" ) or
      diag ("\n%s\n", "$diff");
 
-#unlink "tmp.csv";
-#unlink "tmp2.csv";
+unlink "tmp.csv";
+unlink "tmp2.csv";
 
 $tests++;
 done_testing($tests);
