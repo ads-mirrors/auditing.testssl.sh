@@ -3127,11 +3127,13 @@ emphasize_stuff_in_headers(){
           -e "s/X-Powered-By/${yellow}X-Powered-By${off}/g" \
           -e "s/X-UA-Compatible/${yellow}X-UA-Compatible${off}/g" \
           -e "s/Link/${yellow}Link${off}/g" \
+          -e "s/X-DNS-Prefetch-Control/${html_yellow}X-DNS-Prefetch-Control${html_off}/g" \
           -e "s/X-Rack-Cache/${yellow}X-Rack-Cache${off}/g" \
           -e "s/X-Runtime/${yellow}X-Runtime${off}/g" \
           -e "s/X-Pingback/${yellow}X-Pingback${off}/g" \
           -e "s/X-Permitted-Cross-Domain-Policies/${yellow}X-Permitted-Cross-Domain-Policies${off}/g" \
           -e "s/X-AspNet-Version/${yellow}X-AspNet-Version${off}/g" \
+          -e "s/X-AspNetMvc-Version/${yellow}X-AspNetMvc-Version${off}/g" \
           -e "s/x-note/${yellow}x-note${off}/g" \
           -e "s/x-global-transaction-id/${yellow}x-global-transaction-id${off}/g" \
           -e "s/X-Global-Transaction-ID/${yellow}X-Global-Transaction-ID${off}/g" \
@@ -3177,9 +3179,11 @@ emphasize_stuff_in_headers(){
                     -e "s/Link/${html_yellow}Link${html_off}/g" \
                     -e "s/X-Runtime/${html_yellow}X-Runtime${html_off}/g" \
                     -e "s/X-Rack-Cache/${html_yellow}X-Rack-Cache${html_off}/g" \
+                    -e "s/X-DNS-Prefetch-Control/${html_yellow}X-DNS-Prefetch-Control${html_off}/g" \
                     -e "s/X-Pingback/${html_yellow}X-Pingback${html_off}/g" \
                     -e "s/X-Permitted-Cross-Domain-Policies/${html_yellow}X-Permitted-Cross-Domain-Policies${html_off}/g" \
-                    -e "s/X-AspNet-Version/${html_yellow}X-AspNet-Version${html_off}/g")" \
+                    -e "s/X-AspNet-Version/${html_yellow}X-AspNet-Version${html_off}/g" \
+                    -e "s/X-AspNetMvc-Version/${yellow}X-AspNetMvc-Version${off}/g" \
                     -e "s/x-note/${html_yellow}x-note${html_off}/g" \
                     -e "s/X-Global-Transaction-ID/${html_yellow}X-Global-Transaction-ID${html_off}/g" \
                     -e "s/x-global-transaction-id/${html_yellow}x-global-transaction-id${html_off}/g" \
@@ -3435,13 +3439,14 @@ run_security_headers() {
 
      pr_bold " Security headers             "
      # X-XSS-Protection is useless and at worst harmful, see https://news.ycombinator.com/item?id=20472947
+     # Expect-CT is depecated, see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Expect-CT
      for header_and_svrty in "X-Frame-Options OK" \
                              "X-Content-Type-Options OK" \
                              "Content-Security-Policy OK" \
                              "X-Content-Security-Policy INFO" \
                              "X-WebKit-CSP INFO" \
                              "Content-Security-Policy-Report-Only OK" \
-                             "Expect-CT OK" \
+                             "Expect-CT INFO" \
                              "Permissions-Policy OK" \
                              "Cross-Origin-Opener-Policy INFO" \
                              "Cross-Origin-Resource-Policy INFO" \
@@ -3449,6 +3454,7 @@ run_security_headers() {
                              "X-XSS-Protection INFO" \
                              "Access-Control-Allow-Origin INFO" \
                              "Access-Control-Allow-Credentials INFO" \
+                             "Permissions-Policy INFO" \
                              "Upgrade INFO" \
                              "X-Served-By INFO" \
                              "Referrer-Policy INFO" \
