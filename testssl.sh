@@ -7,9 +7,9 @@
 # vulnerabilities or features. It may or may be not distributed by your distribution.
 # The upstream versions are available (please leave the links intact):
 #
-# Development version       https://github.com/drwetter/testssl.sh
+# Development version       https://github.com/testssl/testssl.sh
 # Stable version            https://testssl.sh
-# File bugs at GitHub       https://github.com/drwetter/testssl.sh/issues
+# File bugs at GitHub       https://github.com/testssl/testssl.sh/issues
 #
 # Project lead and initiator: Dirk Wetter, copyleft: 2007-today, contributions so far see CREDITS.md
 # Main contributions from David Cooper
@@ -399,7 +399,7 @@ RSA_CERT_FINGERPRINT_SHA2=""
 STARTTLS_PROTOCOL=""
 OPTIMAL_PROTO=""                        # Need this for IIS6 (sigh) + OpenSSL 1.0.2, otherwise some handshakes will fail see
                                         # https://github.com/PeterMosmans/openssl/issues/19#issuecomment-100897892
-STARTTLS_OPTIMAL_PROTO=""               # Same for STARTTLS, see https://github.com/drwetter/testssl.sh/issues/188
+STARTTLS_OPTIMAL_PROTO=""               # Same for STARTTLS, see https://github.com/testssl/testssl.sh/issues/188
 OPTIMAL_SOCKETS_PROTO=""                # Same for tls_sockets(). -- not yet used
 ALL_FAILED_SOCKETS=true                 # Set to true if all attempts to connect to server using tls_sockets/sslv2_sockets failed
 TLS_TIME=""                             # To keep the value of TLS server timestamp
@@ -617,7 +617,7 @@ tmln_cyan()     { tm_cyan "$1"; tmln_out; }
 pr_cyan()       { tm_cyan "$1"; [[ "$COLOR" -ge 2 ]] && html_out "<span style=\"color:#0d7ea2;font-weight:bold;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
 prln_cyan()     { pr_cyan "$1"; outln; }
 
-tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/drwetter/testssl.sh/pull/600#issuecomment-276129876
+tm_litegrey()   { [[ "$COLOR" -ne 0 ]] && tm_out "\033[0;37m$1" || tm_out "$1"; tm_off; }                         # ... https://github.com/testssl/testssl.sh/pull/600#issuecomment-276129876
 tmln_litegrey() { tm_litegrey "$1"; tmln_out; }                                                                   # not really usable on a black background, see ..
 prln_litegrey() { pr_litegrey "$1"; outln; }
 pr_litegrey()   { tm_litegrey "$1"; [[ "$COLOR" -ne 0 ]] && html_out "<span style=\"color:#71767a;\">$(html_reserved "$1")</span>" || html_out "$(html_reserved "$1")"; }
@@ -1037,7 +1037,7 @@ get_cipher() {
      # However there seem to be cases where the preferred  $(< "$1")  logic has a problem.
      # Especially with bash 3.2 (Mac OS X) and when on the server side binary chars
      # are returned, see https://stackoverflow.com/questions/7427262/how-to-read-a-file-into-a-variable-in-shell#22607352
-     # and https://github.com/drwetter/testssl.sh/issues/1292
+     # and https://github.com/testssl/testssl.sh/issues/1292
      # Performance measurements showed no to barely measurable penalty (1s displayed in 9 tries).
 
      if [[ "$server_hello" =~ Cipher\ *:\ ([A-Z0-9]+-[A-Za-z0-9\-]+|TLS_[A-Za-z0-9_]+|SSL_[A-Za-z0-9_]+) ]]; then
@@ -4935,9 +4935,9 @@ client_simulation_sockets() {
           data+=", ${clienthello:i:2}"
      done
      # same as above. If a CIPHER_SUITES string was provided, then check that it is in the ServerHello
-     # this appeared 1st in yassl + MySQL (https://github.com/drwetter/testssl.sh/pull/784) but adds
+     # this appeared 1st in yassl + MySQL (https://github.com/testssl/testssl.sh/pull/784) but adds
      # robustness to the implementation
-     # see also https://github.com/drwetter/testssl.sh/pull/797
+     # see also https://github.com/testssl/testssl.sh/pull/797
      if [[ "${1:0:4}" == 1603 ]]; then
           # Extract list of cipher suites from SSLv3 or later ClientHello
           sid_len=4*$(hex2dec "${data:174:2}")
@@ -5295,7 +5295,9 @@ run_client_simulation() {
                          fi
                          if [[ -n "$what_dh" ]]; then
                               [[ -n "$curve" ]] && curve="($curve)"
-                              if [[ "$what_dh" == ECDH ]]; then
+                              if [[ "$what_dh" =~ MLKEM ]] || [[ "$what_dh" =~ Kyber ]]; then
+                                   pr_kem_quality "$bits" "$(printf -- "%-12s" "$what_dh")"
+                              elif [[ "$what_dh" == ECDH ]]; then
                                    pr_ecdh_quality "$bits" "$(printf -- "%-12s" "$bits bit $what_dh") $curve"
                               else
                                    pr_dh_quality "$bits" "$(printf -- "%-12s" "$bits bit $what_dh") $curve"
@@ -6484,7 +6486,7 @@ pr_ecdh_quality() {
      elif [[ "$bits" -le 163 ]]; then
           pr_svrty_medium "$string"
      elif [[ "$bits" -le 193 ]]; then   # hmm, according to https://wiki.openssl.org/index.php/Elliptic_Curve_Cryptography it should ok
-          pr_svrty_low "$string"        # but openssl removed it https://github.com/drwetter/testssl.sh/issues/299#issuecomment-220905416
+          pr_svrty_low "$string"        # but openssl removed it https://github.com/testssl/testssl.sh/issues/299#issuecomment-220905416
      elif [[ "$bits" -le 224 ]]; then
           out "$string"
      elif [[ "$bits" -gt 224 ]]; then
@@ -6531,6 +6533,30 @@ pr_ecdh_curve_quality() {
           "X448") bits=448  ;;
      esac
      pr_ecdh_quality "$bits" "$curve"
+}
+
+pr_kem_quality() {
+     local bits="$1"
+     local string="$2"
+
+     # At the moment all KEMs offer at least 128 bits of security strength
+     # (comparable to 256-bit elliptic curve key). So, all KEMs should be
+     # considered good.
+     pr_svrty_good "$string"
+}
+
+
+pr_kem_param_set_quality() {
+     kem="$1"
+     local -i bits=0
+
+     case "$kem" in
+          "SecP256r1MLKEM768") bits=192  ;;
+          "X25519MLKEM768") bits=192  ;;
+          "SecP384r1MLKEM1024") bits=256 ;;
+          "X25519Kyber768Draft00") bits=128  ;;
+     esac
+     pr_kem_quality "$bits" "$kem"
 }
 
 # Return a value that is an indicator of the quality of the cipher in $1:
@@ -6685,6 +6711,10 @@ read_dhtype_from_file() {
      kx="Kx=${temp%%,*}"
      [[ "$kx" == "Kx=X25519" ]] && kx="Kx=ECDH"
      [[ "$kx" == "Kx=X448" ]] && kx="Kx=ECDH"
+     [[ "$kx" == "Kx=SecP256r1MLKEM768" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=X25519MLKEM768" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=SecP384r1MLKEM1024" ]] && kx="Kx=ECDH/MLKEM"
+     [[ "$kx" == "Kx=X25519Kyber768Draft00" ]] && kx="Kx=ECDH/Kyber"
      tm_out "$kx"
      return 0
 }
@@ -8395,12 +8425,14 @@ wildcard_match()
 #    8, if the server name provided is a wildcard match against the CN
 #    9, if the server name provided matches a name in the SAN AND is a wildcard match against the CN
 #   10, if the server name provided is a wildcard match against the CN AND a name in the SAN
+#
+#  Add 128 to the return value if the CN or a DNS name in the SAN is a wildcard.
 
 compare_server_name_to_cert() {
      local cert="$1"
      local servername cns cn dns_sans ip_sans san dercert tag
      local srv_id="" xmppaddr=""
-     local -i i len len1 cn_match=0
+     local -i i len len1 cn_match=0 wildcard_cert=0
      local -i subret=0             # no error condition, passing results
 
      HAS_DNS_SANS=false
@@ -8545,10 +8577,16 @@ compare_server_name_to_cert() {
      fi
 
      # Check whether any of the DNS names in the certificate are wildcard names
-     # that match the servername
+     # and if they match the servername
      if [[ $subret -eq 0 ]]; then
           while read san; do
                [[ -n "$san" ]] || continue
+               is_wildcard "$san"
+               if [[ $? -eq 0 ]]; then
+                     wildcard_cert=128
+               else
+                    continue
+               fi
                wildcard_match "$servername" "$san"
                [[ $? -eq 0 ]] && subret=2 && break
           done <<< "$dns_sans"
@@ -8564,13 +8602,20 @@ compare_server_name_to_cert() {
           # Check whether the CN matches the servername
           [[ $(toupper "$cn") == "$servername" ]] && cn_match=4 && break
 
-          # Check whether the CN is a wildcard name that matches the servername
+          # Check whether the CN is a wildcard name and if it matches the servername
           # NOTE: Don't stop loop on a wildcard match in case there is another CN
           # that is an exact match.
+          is_wildcard "$cn"
+          if [[ $? -eq 0 ]]; then
+                wildcard_cert=128
+          else
+               continue
+          fi
           wildcard_match "$servername" "$cn"
           [[ $? -eq 0 ]] && cn_match=8
      done <<< "$cns"
      subret+=$cn_match
+     subret+=$wildcard_cert
      return $subret
 }
 
@@ -9465,7 +9510,7 @@ certificate_info() {
      #      supported by the client.
      has_dns_sans=$HAS_DNS_SANS
 
-     case $trust_sni in
+     case $((trust_sni%128)) in
           0) trustfinding="certificate does not match supplied URI"
              set_grade_cap "M" "Domain name mismatch"
              ;;
@@ -9492,10 +9537,10 @@ certificate_info() {
              ;;
      esac
 
-     if [[ $trust_sni -eq 0 ]]; then
+     if [[ $((trust_sni%128)) -eq 0 ]]; then
           pr_svrty_high "$trustfinding"
           trust_sni_finding="HIGH"
-     elif [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
+     elif [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
           if [[ $SERVICE == HTTP ]] || "$ASSUME_HTTP"; then
                # https://bugs.chromium.org/p/chromium/issues/detail?id=308330
                # https://bugzilla.mozilla.org/show_bug.cgi?id=1245280
@@ -9522,17 +9567,17 @@ certificate_info() {
      # See issue #733.
      if [[ -z "$sni_used" ]]; then
           trustfinding_nosni=""
-     elif [[ $trust_sni -eq $trust_nosni && "$has_dns_sans" == "$has_dns_sans_nosni" ]] || \
-          [[ $trust_sni -eq 0 && $trust_nosni -eq 0 ]]; then
+     elif [[ $((trust_sni%128)) -eq $((trust_nosni%128)) && "$has_dns_sans" == "$has_dns_sans_nosni" ]] || \
+          [[ $((trust_sni%128)) -eq 0 && $((trust_nosni%128)) -eq 0 ]]; then
           trustfinding_nosni=" (same w/o SNI)"
-     elif [[ $trust_nosni -eq 0 ]]; then
-          if [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
+     elif [[ $((trust_nosni%128)) -eq 0 ]]; then
+          if [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
                trustfinding_nosni=" (w/o SNI: certificate does not match supplied URI)"
           else
                trustfinding_nosni=" (SNI mandatory)"
           fi
-     elif [[ $trust_nosni -eq 4 ]] || [[ $trust_nosni -eq 8 ]] || [[ $trust_sni -eq 4 ]] || [[ $trust_sni -eq 8 ]]; then
-          case $trust_nosni in
+     elif [[ $((trust_nosni%128)) -eq 4 ]] || [[ $((trust_nosni%128)) -eq 8 ]] || [[ $((trust_sni%128)) -eq 4 ]] || [[ $((trust_sni%128)) -eq 8 ]]; then
+          case $((trust_nosni%128)) in
                1) trustfinding_nosni=" (w/o SNI: Ok via SAN)" ;;
                2) trustfinding_nosni=" (w/o SNI: Ok via SAN wildcard)" ;;
                4) if "$has_dns_sans_nosni"; then
@@ -9552,12 +9597,12 @@ certificate_info() {
                9) trustfinding_nosni=" (w/o SNI: Ok via CN wildcard and SAN)" ;;
               10) trustfinding_nosni=" (w/o SNI: Ok via SAN wildcard and CN wildcard)" ;;
           esac
-     elif [[ $trust_sni -ne 0 ]]; then
+     elif [[ $((trust_sni%128)) -ne 0 ]]; then
           trustfinding_nosni=" (works w/o SNI)"
      else
           trustfinding_nosni=" (however, works w/o SNI)"
      fi
-     if [[ -n "$sni_used" ]] || [[ $trust_nosni -eq 0 ]] || [[ $trust_nosni -ne 4 && $trust_nosni -ne 8 ]]; then
+     if [[ -n "$sni_used" ]] || [[ $((trust_nosni%128)) -eq 0 ]] || [[ $((trust_nosni%128)) -ne 4 && $((trust_nosni%128)) -ne 8 ]]; then
           outln "$trustfinding_nosni"
      elif [[ $SERVICE == HTTP ]] || "$ASSUME_HTTP"; then
           prln_svrty_high "$trustfinding_nosni"
@@ -9567,7 +9612,7 @@ certificate_info() {
 
      fileout "cert_trust${json_postfix}" "$trust_sni_finding" "${trustfinding}${trustfinding_nosni}"
 
-     if [[ "$trust_sni" =~ ^(2|6|8|9|10)$ ]] || [[ "$trust_nosni" =~ ^(2|6|8|9|10)$ ]]; then
+     if [[ $((trust_sni&128)) -eq 128 ]] || [[ $((trust_nosni&128)) -eq 128 ]]; then
           out "${spaces}"
           pr_svrty_low "wildcard certificate" ; outln " could be problematic, see other hosts at"
           outln "${spaces}https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=$cert_fingerprint_sha2"
@@ -10173,7 +10218,7 @@ run_server_defaults() {
                          # $NODE being tested or if it has the same subject
                          # (CN and SAN) as other certificates for this host.
                          compare_server_name_to_cert "$HOSTCERT"
-                         [[ $? -ne 0 ]] && success[n]=0 || success[n]=1
+                         [[ $(($?%128)) -ne 0 ]] && success[n]=0 || success[n]=1
 
                          if [[ ${success[n]} -ne 0 ]]; then
                               cn_nosni="$(toupper "$(get_cn_from_cert $HOSTCERT)")"
@@ -10506,13 +10551,13 @@ run_fs() {
      local fs_cipher_list="DHE-DSS-AES128-GCM-SHA256:DHE-DSS-AES128-SHA256:DHE-DSS-AES128-SHA:DHE-DSS-AES256-GCM-SHA384:DHE-DSS-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-DSS-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA:DHE-DSS-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA:DHE-DSS-SEED-SHA:DHE-RSA-AES128-CCM8:DHE-RSA-AES128-CCM:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-CCM8:DHE-RSA-AES256-CCM:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA:DHE-RSA-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-RSA-CHACHA20-POLY1305-OLD:DHE-RSA-CHACHA20-POLY1305:DHE-RSA-SEED-SHA:ECDHE-ECDSA-AES128-CCM8:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-ECDSA-AES256-CCM8:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-ECDSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305-OLD:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-RSA-CHACHA20-POLY1305-OLD:ECDHE-RSA-CHACHA20-POLY1305"
      local fs_hex_cipher_list="" ciphers_to_test tls13_ciphers_to_test
      local ecdhe_cipher_list="" tls13_cipher_list="" ecdhe_cipher_list_hex="" ffdhe_cipher_list_hex=""
-     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21")
-     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
-     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13")
-     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512)
+     local curves_hex=("00,01" "00,02" "00,03" "00,04" "00,05" "00,06" "00,07" "00,08" "00,09" "00,0a" "00,0b" "00,0c" "00,0d" "00,0e" "00,0f" "00,10" "00,11" "00,12" "00,13" "00,14" "00,15" "00,16" "00,17" "00,18" "00,19" "00,1a" "00,1b" "00,1c" "00,1d" "00,1e" "00,1f" "00,20" "00,21" "11,eb" "11,ec" "11,ed" "63,99")
+     local -a curves_ossl=("sect163k1" "sect163r1" "sect163r2" "sect193r1" "sect193r2" "sect233k1" "sect233r1" "sect239k1" "sect283k1" "sect283r1" "sect409k1" "sect409r1" "sect571k1" "sect571r1" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "prime192v1" "secp224k1" "secp224r1" "secp256k1" "prime256v1" "secp384r1" "secp521r1" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -a curves_ossl_output=("K-163" "sect163r1" "B-163" "sect193r1" "sect193r2" "K-233" "B-233" "sect239k1" "K-283" "B-283" "K-409" "B-409" "K-571" "B-571" "secp160k1" "secp160r1" "secp160r2" "secp192k1" "P-192" "secp224k1" "P-224" "secp256k1" "P-256" "P-384" "P-521" "brainpoolP256r1" "brainpoolP384r1" "brainpoolP512r1" "X25519" "X448" "brainpoolP256r1tls13" "brainpoolP384r1tls13" "brainpoolP512r1tls13" "SecP256r1MLKEM768" "X25519MLKEM768" "SecP384r1MLKEM1024" "X25519Kyber768Draft00")
+     local -ai curves_bits=(163 162 163 193 193 232 233 238 281 282 407 409 570 570 161 161 161 192 192 225 224 256 256 384 521 256 384 512 253 448 256 384 512 192 192 256 128)
      # Many curves have been deprecated, and RFC 8446, Appendix B.3.1.4, states
      # that these curves MUST NOT be offered in a TLS 1.3 ClientHello.
-     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false")
+     local -a curves_deprecated=("true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "true" "false" "false" "false" "true" "true" "true" "false" "false" "false" "false" "false" "false" "false" "false" "false")
      local -a ffdhe_groups_hex=("01,00" "01,01" "01,02" "01,03" "01,04")
      local -a ffdhe_groups_output=("ffdhe2048" "ffdhe3072" "ffdhe4096" "ffdhe6144" "ffdhe8192")
      local -a supported_curve
@@ -10523,7 +10568,7 @@ run_fs() {
      local rsa_cipher="" ecdsa_cipher="" dss_cipher=""
      local sigalgs_to_test tls12_supported_sigalg_list="" tls13_supported_sigalg_list=""
      local -i nr_supported_ciphers=0 nr_curves=0 nr_ossl_curves=0 i j low high
-     local fs_ciphers curves_offered="" curves_to_test temp
+     local fs_ciphers curves_offered="" kems_offered="" curves_to_test temp
      local curves_option="" curves_list1="" curves_list2=""
      local len1 len2 curve_found sigalg_found
      local key_bitstring quality_str
@@ -10713,7 +10758,7 @@ run_fs() {
                     else
                          ! "$fs_tls12_offered" && [[ "$(get_protocol "$TMPFILE")" == TLSv1.2 ]] && fs_tls12_offered=true
                     fi
-                    if "$WIDE"; then
+                    if "$WIDE" && [[ ${kx[i]} == Kx=ECDH || ${kx[i]} == Kx=DH || ${kx[i]} == Kx=EDH ]]; then
                          dhlen=$(read_dhbits_from_file "$TMPFILE" quiet)
                          kx[i]="${kx[i]} $dhlen"
                     fi
@@ -10749,7 +10794,7 @@ run_fs() {
                               fs_tls13_offered=true
                               "$WIDE" && kx[i]="$(read_dhtype_from_file "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")"
                          fi
-                         if "$WIDE"; then
+                         if "$WIDE" && [[ ${kx[i]} == Kx=ECDH || ${kx[i]} == Kx=DH || ${kx[i]} == Kx=EDH ]]; then
                               dhlen=$(read_dhbits_from_file "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" quiet)
                               kx[i]="${kx[i]} $dhlen"
                          fi
@@ -10813,7 +10858,7 @@ run_fs() {
                fi
           fi
           debugme echo $fs_offered
-          "$WIDE" || outln
+          outln
           fileout "${jsonID}_ciphers" "INFO" "$fs_ciphers"
      fi
 
@@ -10924,12 +10969,21 @@ run_fs() {
           low=1000
           for (( i=0; i < nr_curves; i++ )); do
                if "${supported_curve[i]}"; then
-                    curves_offered+="${curves_ossl[i]} "
-                    [[ ${curves_bits[i]} -lt $low ]] && low=${curves_bits[i]}
+                    if [[ "${curves_ossl[i]}" =~ KEM ]] || [[ "${curves_ossl[i]}" =~ Kyber ]]; then
+                         kems_offered+="${curves_ossl[i]} "
+                    else
+                         curves_offered+="${curves_ossl[i]} "
+                         [[ ${curves_bits[i]} -lt $low ]] && low=${curves_bits[i]}
+                    fi
                fi
           done
+          if [[ -n "$kems_offered" ]]; then
+               pr_bold " KEMs offered                 "
+               out_row_aligned_max_width_by_entry "$kems_offered" "                              " $TERM_WIDTH pr_kem_param_set_quality
+               outln
+               fileout "${jsonID}_KEMs" "OK" "$kems_offered"
+          fi
           if [[ -n "$curves_offered" ]]; then
-               "$WIDE" && outln
                pr_bold " Elliptic curves offered:     "
                out_row_aligned_max_width_by_entry "$curves_offered" "                              " $TERM_WIDTH pr_ecdh_curve_quality
                outln
@@ -11088,25 +11142,27 @@ run_fs() {
                     # A few servers get confused if the signature_algorithms extension contains too many entries. So:
                     # * For TLS 1.3, break the list into two and test each half separately.
                     # * For TLS 1.2, generally limit the signature_algorithms extension to algorithms that are consistent with the key type.
+                    # At least one server gets confused if RSA+MD5 is offered first. So, the ordering is reversed so that the strongest
+                    # options appear in $sigalgs_to_test first.
                     for hexc in "${sigalgs_hex[@]}"; do
                          if [[ "$proto" == 04* ]]; then
                               if ! "${tls13_supported_sigalgs[i]}"; then
                                    if [[ "${proto##*-}" == 01 ]]; then
-                                        [[ $i -le 16 ]] && sigalgs_to_test+=", $hexc"
+                                        [[ $i -le 16 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    else
-                                        [[ $i -gt 16 ]] && sigalgs_to_test+=", $hexc"
+                                        [[ $i -gt 16 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               fi
                          elif ! "${tls12_supported_sigalgs[i]}"; then
                               if [[ "$proto" =~ rsa ]]; then
                                    if [[ "${hexc:3:2}" == 01 ]] || [[ "${hexc:0:2}" == 08 ]]; then
-                                        sigalgs_to_test+=", $hexc"
+                                        sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               elif [[ "$proto" =~ dss ]]; then
-                                   [[ "${hexc:3:2}" == 02 ]] && sigalgs_to_test+=", $hexc"
+                                   [[ "${hexc:3:2}" == 02 ]] && sigalgs_to_test=", $hexc$sigalgs_to_test"
                               else
                                    if [[ "${hexc:3:2}" == 03 ]] || [[ "${hexc:0:2}" == 08 ]]; then
-                                        sigalgs_to_test+=", $hexc"
+                                        sigalgs_to_test=", $hexc$sigalgs_to_test"
                                    fi
                               fi
                          fi
@@ -14505,6 +14561,10 @@ parse_tls_serverhello() {
                                          "0102") echo -n "ffdhe4096" >> $TMPFILE ;;
                                          "0103") echo -n "ffdhe6144" >> $TMPFILE ;;
                                          "0104") echo -n "ffdhe8192" >> $TMPFILE ;;
+                                         "11EB") echo -n "SecP256r1MLKEM768" >> $TMPFILE ;;
+                                         "11EC") echo -n "X25519MLKEM768" >> $TMPFILE ;;
+                                         "11ED") echo -n "SecP384r1MLKEM1024" >> $TMPFILE ;;
+                                         "6399") echo -n "X25519Kyber768Draft00" >> $TMPFILE ;;
                                               *) echo -n "unknown (${tls_serverhello_ascii:offset:4})" >> $TMPFILE ;;
                                     esac
                                     offset=$((offset+4))
@@ -14600,6 +14660,10 @@ parse_tls_serverhello() {
                                     258) dh_bits=4096 ; named_curve_str="ffdhe4096" ;;
                                     259) dh_bits=6144 ; named_curve_str="ffdhe6144" ;;
                                     260) dh_bits=8192 ; named_curve_str="ffdhe8192" ;;
+                                    4587) dh_bits=192 ; named_curve_str="SecP256r1MLKEM768" ;;
+                                    4588) dh_bits=192 ; named_curve_str="X25519MLKEM768" ;;
+                                    4589) dh_bits=256 ; named_curve_str="SecP384r1MLKEM1024" ;;
+                                    25497) dh_bits=128 ; named_curve_str="X25519Kyber768Draft00" ;;
                                     *) named_curve_str="" ; named_curve_oid="" ;;
                                esac
                                offset=$((extns_offset+20+i))
@@ -14787,9 +14851,9 @@ parse_tls_serverhello() {
      fi
      echo "Cipher    : $rfc_cipher_suite" >> $TMPFILE
      if [[ $dh_bits -ne 0 ]]; then
-          if [[ "$named_curve_str" =~ "ffdhe" ]]; then
+          if [[ "$named_curve_str" =~ ffdhe ]]; then
                echo "Server Temp Key: DH, $named_curve_str, $dh_bits bits" >> $TMPFILE
-          elif [[ "$named_curve_str" == "X25519" ]] || [[ "$named_curve_str" == "X448" ]]; then
+          elif [[ "$named_curve_str" == X25519 ]] || [[ "$named_curve_str" == X448 ]] || [[ "$named_curve_str" =~ KEM ]] || [[ "$named_curve_str" =~ Kyber ]]; then
                echo "Server Temp Key: $named_curve_str, $dh_bits bits" >> $TMPFILE
           else
                echo "Server Temp Key: ECDH, $named_curve_str, $dh_bits bits" >> $TMPFILE
@@ -14832,9 +14896,9 @@ parse_tls_serverhello() {
                echo ""
           fi
           if [[ $dh_bits -ne 0 ]]; then
-               if [[ "$named_curve_str" =~ "ffdhe" ]]; then
+               if [[ "$named_curve_str" =~ ffdhe ]]; then
                     echo "     dh_bits:                DH, $named_curve_str, $dh_bits bits"
-               elif [[ "$named_curve_str" == "X25519" ]] || [[ "$named_curve_str" == "X448" ]]; then
+               elif [[ "$named_curve_str" == X25519 ]] || [[ "$named_curve_str" == X448 ]] || [[ "$named_curve_str" =~ KEM ]] || [[ "$named_curve_str" =~ Kyber ]]; then
                     echo "     dh_bits:                $named_curve_str, $dh_bits bits"
                else
                     echo "     dh_bits:                ECDH, $named_curve_str, $dh_bits bits"
@@ -14870,7 +14934,7 @@ parse_tls_serverhello() {
      fi
 
      # If a CIPHER_SUITES string was provided, then check that $tls_cipher_suite is in the string.
-     # this appeared in yassl + MySQL (https://github.com/drwetter/testssl.sh/pull/784) but adds robustness
+     # this appeared in yassl + MySQL (https://github.com/testssl/testssl.sh/pull/784) but adds robustness
      # to the implementation
      if [[ -n "$cipherlist" ]]; then
           tls_cipher_suite="$(tolower "$tls_cipher_suite")"
@@ -15623,7 +15687,15 @@ prepare_tls_clienthello() {
                00, 01, 00, 02, 00, 03, 00, 0f, 00, 10, 00, 11, 01, 00, 01, 01"
           elif [[ 0x$tls_low_byte -gt 0x03 ]]; then
                # Supported Groups Extension
-               if [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
+               if [[ ! "$process_full" =~ all ]]; then
+                    extension_supported_groups="
+                    00,0a,                      # Type: Supported Groups, see RFC 8446
+                    00,1e, 00,1c,               # lengths
+                    00,1d, 00,17, 00,1e, 00,18, 00,19, 00,1f, 00,20, 00,21,
+                    01,00, 01,01, 11,eb, 11,ec, 11,ed, 63,99"
+                    # Only include ML-KEM and Kyber hybrids as options if the response does
+                    # not need to be decrypted.
+               elif [[ ! "$process_full" =~ all ]] || { "$HAS_X25519" && "$HAS_X448"; }; then
                     extension_supported_groups="
                     00,0a,                      # Type: Supported Groups, see RFC 8446
                     00,16, 00,14,               # lengths
@@ -15645,7 +15717,7 @@ prepare_tls_clienthello() {
                     00,1d, 00,17, 00,18, 00,19, 00,1f, 00,20, 00,21,
                     01,00, 01,01, 00,1e"
                     # OpenSSL prior to 1.1.0 does not support either X25519 or X448,
-                    # so list them as the least referred options if the response
+                    # so list them as the least preferred options if the response
                     # needs to be decrypted, and do not list them at all if the
                     # response MUST be decrypted.
                elif [[ "$process_full" == all+ ]]; then
@@ -15735,7 +15807,7 @@ prepare_tls_clienthello() {
           # There does not seem to be any reason to include this extension. However, it appears that
           # OpenSSL, Firefox, and Chrome include it in TLS 1.3 ClientHello messages, and there is at
           # least one server that will fail the connection if it is absent
-          # (see https://github.com/drwetter/testssl.sh/issues/990).
+          # (see https://github.com/testssl/testssl.sh/issues/990).
           if [[ "0x$tls_low_byte" -ge 0x04 ]] && [[ ! "$extra_extensions_list" =~ \ 002d\  ]]; then
                [[ -n "$all_extensions" ]] && all_extensions+=","
                all_extensions+="$extn_psk_mode"
@@ -17208,7 +17280,7 @@ run_renego() {
                # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
                if tail -5 $TMPFILE| grep -qa '^closed'; then
                     # Exemption from above: server closed the connection but return value was zero
-                    # See https://github.com/drwetter/testssl.sh/issues/1725 and referenced issue @haproxy
+                    # See https://github.com/testssl/testssl.sh/issues/1725 and referenced issue @haproxy
                     sec_client_renego=1
                fi
                case "$sec_client_renego" in
@@ -18017,7 +18089,7 @@ run_tls_fallback_scsv() {
           elif grep -qa "alert handshake failure" "$TMPFILE"; then
                pr_svrty_good "Probably OK. "
                fileout "$jsonID" "OK" "Probably oK"
-               # see RFC 7507, https://github.com/drwetter/testssl.sh/issues/121
+               # see RFC 7507, https://github.com/testssl/testssl.sh/issues/121
                # other case reported by Nicolas was F5 and at customer of mine: the same
                pr_svrty_medium "But received non-RFC-compliant \"handshake failure\" instead of \"inappropriate fallback\""
                fileout "$jsonID" "MEDIUM" "received non-RFC-compliant \"handshake failure\" instead of \"inappropriate fallback\""
@@ -20346,8 +20418,8 @@ find_openssl_binary() {
      $OPENSSL s_client -tls1_3 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_TLS13=true
      $OPENSSL s_client -no_ssl2 </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_SSL2=true
 
-     $OPENSSL genpkey -algorithm X448 2>&1 | grep -aq "not found" || HAS_X448=true
-     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -aq "not found" || HAS_X25519=true
+     $OPENSSL genpkey -algorithm X448 2>&1 | grep -Eaq "not found|unsupported" || HAS_X448=true
+     $OPENSSL genpkey -algorithm X25519 2>&1 | grep -Eaq "not found|unsupported" || HAS_X25519=true
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error ||  HAS_PKUTIL=true
 
@@ -21294,7 +21366,7 @@ get_local_a() {
 check_resolver_bins() {
      local saved_openssl_conf="$OPENSSL_CONF"
 
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      type -p dig   &> /dev/null &&  HAS_DIG=true
      type -p host  &> /dev/null &&  HAS_HOST=true
      type -p drill &> /dev/null &&  HAS_DRILL=true
@@ -21316,7 +21388,7 @@ check_resolver_bins() {
                HAS_DIG_NOIDNOUT=true
           fi
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      return 0
 }
 
@@ -21339,7 +21411,7 @@ get_a_record() {
           echo $1
           return 0
      fi
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
           if "$HAS_AVAHIRESOLVE"; then
                ip4=$(filter_ip4_address $(avahi-resolve -4 -n "$1" 2>/dev/null | awk '{ print $2 }'))
@@ -21364,7 +21436,7 @@ get_a_record() {
      if [[ -z "$ip4" ]] && "$HAS_NSLOOKUP"; then
           ip4=$(filter_ip4_address $(strip_lf "$(nslookup -querytype=a "$1" 2>/dev/null | awk '/^Name/ { getline; print $NF }')"))
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      echo "$ip4"
 }
 
@@ -21377,7 +21449,7 @@ get_aaaa_record() {
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
      [[ "$NODNS" == none ]] && return 0      # if no DNS lookup was instructed, leave here
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      if is_ipv6addr "$1"; then
           # This saves walking through this. Also it avoids hangs e.g. if you run docker locally without reachable DNS
           echo "$1"
@@ -21411,7 +21483,7 @@ get_aaaa_record() {
                ip6=$(filter_ip6_address $(strip_lf "$(nslookup -type=aaaa "$1" 2>/dev/null | awk '/'"^${a}"'.*AAAA/ { print $NF }')"))
           fi
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      echo "$ip6"
 }
 
@@ -21457,7 +21529,7 @@ get_caa_rr_record() {
           return 1
           # No dig, drill, host, or nslookup --> complaint was elsewhere already
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      debugme echo $raw_caa
 
      if [[ "$raw_caa" =~ \#\ [0-9][0-9] ]]; then
@@ -21505,7 +21577,7 @@ get_mx_record() {
      local noidnout=""
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      # we need the last two columns here
      if "$HAS_HOST"; then
           mx="$(host -t MX "$1" 2>/dev/null | awk '/is handled by/ { print $(NF-1), $NF }')"
@@ -21532,7 +21604,7 @@ get_txt_record() {
      local noidnout=""
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
-     OPENSSL_CONF=""                         # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      # we need the last two columns here and strip any remaining double quotes later
      if "$HAS_HOST"; then
           record="$(host -t TXT "$1" 2>/dev/null | awk -F\" '/descriptive text/ { print $(NF-1) }')"
@@ -21633,7 +21705,7 @@ determine_rdns() {
      [[ "$NODNS" == none ]] && rDNS="(instructed to skip DNS queries)" && return 0        # No DNS lookups at all
      [[ "$NODNS" == min ]] && rDNS="(instructed to minimize DNS queries)" && return 0     # PTR records were not asked for
      local nodeip="$(tr -d '[]' <<< $NODEIP)"               # for DNS we do not need the square brackets of IPv6 addresses
-     OPENSSL_CONF=""                                        # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF=""                                        # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
           if "$HAS_AVAHIRESOLVE"; then
                rDNS=$(avahi-resolve -a $nodeip 2>/dev/null | awk '{ print $2 }')
@@ -21650,7 +21722,7 @@ determine_rdns() {
      elif "$HAS_NSLOOKUP"; then
           rDNS=$(strip_lf "$(nslookup -type=PTR $nodeip 2>/dev/null | grep -v 'canonical name =' | grep 'name = ' | awk '{ print $NF }' | sed 's/\.$//')")
      fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      # First, rDNS can contain multilines due to multiple PTR DNS records, though this is not recommended.
      # So we use a loop to check for each FQDN returned. There we remove chars which under weird
      # circumstances (see #1506) can show up here. The blacklist is taken from RFC 1912 ("Allowable characters in a
@@ -22046,7 +22118,7 @@ determine_optimal_proto() {
 
      >$ERRFILE
      if [[ -n "$1" ]]; then
-          # STARTTLS workaround needed see https://github.com/drwetter/testssl.sh/issues/188 -- kind of odd
+          # STARTTLS workaround needed see https://github.com/testssl/testssl.sh/issues/188 -- kind of odd
           for STARTTLS_OPTIMAL_PROTO in -tls1_2 -tls1 -ssl3 -tls1_1 -tls1_3 -ssl2; do
                sclient_supported "$STARTTLS_OPTIMAL_PROTO" || continue
                $OPENSSL s_client $(s_client_options "$STARTTLS_OPTIMAL_PROTO $BUGS -connect "$NODEIP:$PORT" $PROXY -msg $STARTTLS $SNI") </dev/null >$TMPFILE 2>>$ERRFILE
