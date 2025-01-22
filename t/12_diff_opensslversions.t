@@ -11,7 +11,7 @@ use Text::Diff;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $check2run="-q --ip=one --color 0 --csvfile";
+my $check2run="--protocols --std --server-preference --fs --header --renegotiation --crime --breach --poodle --tls-fallback --sweet32 --beast --lucky13 --freak --logjam --drown --rc4 --phone-out --client-simulation -q --ip=one --color 0 --csvfile";
 my $csvfile="tmp.csv";
 my $csvfile2="tmp2.csv";
 my $cat_csvfile="";
