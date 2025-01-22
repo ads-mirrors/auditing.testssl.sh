@@ -20685,7 +20685,7 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -e, --each-cipher             checks each local cipher remotely
      -E, --cipher-per-proto        checks those per protocol
      -s, --std, --categories       tests standard cipher categories by strength
-     -f, --fs, --nsa               checks forward secrecy settings
+     -f, --fs, --forward-secrecy   checks forward secrecy settings
      -p, --protocols               checks TLS/SSL protocols (including SPDY/HTTP2)
      -g, --grease                  tests several server implementation bugs like GREASE and size limitations
      -S, --server-defaults         displays the server's default picks and certificate info
