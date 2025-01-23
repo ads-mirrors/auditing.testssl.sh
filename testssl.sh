@@ -532,8 +532,6 @@ out()   { printf -- "%b" "$1"; html_out "$(html_reserved "$1")"; }
 outln() { printf -- "%b" "$1\n"; html_out "$(html_reserved "$1")\n"; }
 
 
-#TODO: Still no shell injection safe but if just run it from the cmd line: that's fine
-
 # Color print functions, see also https://www.tldp.org/HOWTO/Bash-Prompt-HOWTO/x329.html
 tm_liteblue()   { [[ "$COLOR" -ge 2 ]] && ( "$COLORBLIND" && tm_out "\033[0;32m$1" || tm_out "\033[0;34m$1" ) || tm_out "$1"; tm_off; }    # not yet used
 pr_liteblue()   { tm_liteblue "$1"; [[ "$COLOR" -ge 2 ]] && ( "$COLORBLIND" && html_out "<span style=\"color:#00cd00;\">$(html_reserved "$1")</span>" || html_out "<span style=\"color:#0000ee;\">$(html_reserved "$1")</span>" ) || html_out "$(html_reserved "$1")"; }
@@ -2827,7 +2825,7 @@ emphasize_stuff_in_headers(){
      if "$do_html"; then
           if [[ $COLOR -ge 2 ]]; then
                html_out "$(tm_out "$1" | sed -e 's/\&/\&amp;/g' \
-                    -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&apos;/g" \
+                    -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/\"/\&quot;/g' -e "s/\'/\&apos;/g" \
                     -e "s/\([0-9]\)/${html_brown}\1${html_off}/g" \
                     -e "s/Unix/${html_yellow}Unix${html_off}/g" \
                     -e "s/Debian/${html_yellow}Debian${html_off}/g" \
@@ -2864,16 +2862,15 @@ emphasize_stuff_in_headers(){
                     -e "s/X-Rack-Cache/${html_yellow}X-Rack-Cache${html_off}/g" \
                     -e "s/X-Pingback/${html_yellow}X-Pingback${html_off}/g" \
                     -e "s/X-Permitted-Cross-Domain-Policies/${html_yellow}X-Permitted-Cross-Domain-Policies${html_off}/g" \
-                    -e "s/X-AspNet-Version/${html_yellow}X-AspNet-Version${html_off}/g")" \
+                    -e "s/X-AspNet-Version/${html_yellow}X-AspNet-Version${html_off}/g" \
                     -e "s/x-note/${html_yellow}x-note${html_off}/g" \
                     -e "s/X-Global-Transaction-ID/${html_yellow}X-Global-Transaction-ID${html_off}/g" \
                     -e "s/x-global-transaction-id/${html_yellow}x-global-transaction-id${html_off}/g" \
                     -e "s/Alt-Svc/${html_yellow}Alt-Svc${html_off}/g" \
-                    -e "s/system-wsgw-management-loopback/${html_yellow}system-wsgw-management-loopback${html_off}/g"
-#FIXME: this is double code. The pattern to emphasize would fit better into
-# one function.
-# Also we need another function like run_other_header as otherwise "Link" "Alt-Svc" will never be found.
-# And: I matches case sensitive only which might not detect all banners. (sed ignorecase is not possible w/ BSD sed)
+                    -e "s/system-wsgw-management-loopback/${html_yellow}system-wsgw-management-loopback${html_off}/g" \
+               )"
+#FIXME: this is double code. The pattern to emphasize headers should be better in one single function.
+# And: It matches case sensitive headers only which won't detect all banners. (sed ignorecase is not a/v for OpenBSD sed)
           else
                html_out "$(html_reserved "$1")"
           fi
