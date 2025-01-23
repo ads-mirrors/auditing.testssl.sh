@@ -2870,7 +2870,7 @@ emphasize_stuff_in_headers(){
                     -e "s/system-wsgw-management-loopback/${html_yellow}system-wsgw-management-loopback${html_off}/g" \
                )"
 #FIXME: this is double code. The pattern to emphasize headers should be better in one single function.
-+# And: It matches case sensitive headers only which won't detect all banners. (sed ignorecase is not a/v for OpenBSD sed)
+# And: It matches case sensitive headers only which won't detect all banners. (sed ignorecase is not a/v for OpenBSD sed)
           else
                html_out "$(html_reserved "$1")"
           fi
