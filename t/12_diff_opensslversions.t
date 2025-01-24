@@ -19,6 +19,7 @@ my $cat_csvfile2="";
 my $uri="google.com";
 my $diff="";
 my $distro_openssl="/usr/bin/openssl";
+my @args="";
 
 die "Unable to open $prg" unless -f $prg;
 die "Unable to open $distro_openssl" unless -f $distro_openssl;
@@ -29,11 +30,15 @@ unlink "tmp2.csv";
 
 #1 run
 printf "\n%s\n", "Diff test IPv4 with supplied openssl against \"$uri\"";
-`$prg $check2run $csvfile $uri 2>&1`;
+@args="$prg $check2run $csvfile $uri 2>&1";
+system("@args") == 0
+     or die ("FAILED: \"@args\"");
 
 # 2
 printf "\n%s\n", "Diff test IPv4 with $distro_openssl against \"$uri\"";
-`$prg $check2run $csvfile2 --openssl=$distro_openssl $uri 2>&1`;
+@args="$prg $check2run $csvfile2 --openssl=$distro_openssl $uri 2>&1";
+system("@args") == 0
+     or die ("FAILED: \"@args\" ");
 
 $cat_csvfile  = `cat $csvfile`;
 $cat_csvfile2 = `cat $csvfile2`;
@@ -49,6 +54,10 @@ $cat_csvfile2 =~ s/HTTP_headerTime.*\n//g;
 #engine_problem
 $cat_csvfile  =~  s/"engine_problem.*\n//g;
 $cat_csvfile2  =~ s/"engine_problem.*\n//g;
+
+# PR #2628. TL:DR; make the kx between tls_sockets() and openssl the same for this CI run
+$cat_csvfile  =~  s/ECDH 256/ECDH 253/g;
+$cat_csvfile  =~  s/ECDH\/MLKEM/ECDH 253  /g;
 
 # Nonce in CSP
 $cat_csvfile  =~ s/.nonce-.* //g;
