@@ -11299,7 +11299,7 @@ run_npn() {
           return 0
      fi
 
-     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it wont be used
+     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
      # TLS13_ONLY is tested here again, just to be sure, see npn_pre
      if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
            proto="-no_tls1_3"
