@@ -30,7 +30,7 @@
 * Don't penalize missing trust in rating when CA not in Java store
 * Added support for certificates with EdDSA signatures and public keys
 * Extract CA list shows supported certification authorities sent by the server
-* Wildcard detction of certificate and warning
+* Wildcard certificates: detection and warning
 * TLS 1.2 and TLS 1.3 sig algs added
 * Check for ffdhe groups
 * Check for three KEMs in draft-kwiatkowski-tls-ecdhe-mlkem/draft-tls-westerbaan-xyber768d00
