@@ -11258,6 +11258,12 @@ npn_pre(){
           fileout "NPN" "WARN" "not tested $OPENSSL doesn't support NPN/SPDY"
           return 7
      fi
+     if "$TLS13_ONLY"; then
+          # https://github.com/openssl/openssl/issues/3665
+          pr_warning "There's no such thing as NPN on TLS 1.3-only hosts"
+          fileout "NPN" "WARN" "not possible for TLS 1.3-only hosts"
+          return 6
+     fi
      return 0
 }
 
@@ -11281,16 +11287,24 @@ alpn_pre(){
 run_npn() {
      local tmpstr
      local -i ret=0
+     local proto=""
      local jsonID="NPN"
 
      [[ -n "$STARTTLS" ]] && return 0
      "$FAST" && return 0
      pr_bold " NPN/SPDY   "
+
      if ! npn_pre; then
           outln
           return 0
      fi
-     $OPENSSL s_client $(s_client_options "-connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
+
+     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
+     # TLS13_ONLY is tested here again, just to be sure, see npn_pre
+     if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
+           proto="-no_tls1_3"
+     fi
+     $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
      [[ $? -ne 0 ]] && ret=1
      tmpstr="$(grep -a '^Protocols' $TMPFILE | sed 's/Protocols.*: //')"
      if [[ -z "$tmpstr" ]] || [[ "$tmpstr" == " " ]]; then
