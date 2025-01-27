@@ -21514,6 +21514,7 @@ get_aaaa_record() {
      echo "$ip6"
 }
 
+
 # RFC6844: DNS Certification Authority Authorization (CAA) Resource Record
 # arg1: domain to check for
 #FIXME: should be refactored, see get_https_rrecord()
@@ -21545,12 +21546,16 @@ get_caa_rrecord() {
           raw_caa="$(drill $1 type257 | awk '/'"^${1}"'.*CAA/ { print $5,$6,$7 }')"
      elif "$HAS_HOST"; then
           raw_caa="$(host -t type257 $1)"
-          if grep -Ewvq "has no CAA|has no TYPE257" <<< "$raw_caa"; then
-               raw_caa="$(sed -e 's/^.*has CAA record //' -e 's/^.*has TYPE257 record //' <<< "$raw_caa")"
+          if [[ "$raw_caa" =~ "has no CAA|has no TYPE257" ]]; then
+               raw_caa=""
+          else
+               raw_caa="${raw_caa/$1 has CAA record /}"
+               raw_caa="${raw_caa/$1 has TYPE257 record /}"
           fi
      elif "$HAS_NSLOOKUP"; then
           raw_caa="$(strip_lf "$(nslookup -type=type257 $1 | grep -w rdata_257)")"
           if [[ -n "$raw_caa" ]]; then
+               #FIXME: modernize here  or see HTTPS RR
                raw_caa="$(sed 's/^.*rdata_257 = //' <<< "$raw_caa")"
           fi
      else
@@ -21631,22 +21636,23 @@ get_https_rrecord() {
      # 1) dev.testssl.sh	rdata_65 = 1 . alpn="h2"
      # 2) dev.testssl.sh	rdata_65 = \# 10 00010000010003026832
 
-     # we normalize the output during the following so that's either 1) 1 . alpn="h2"  or 2) \# 10 00010000010003026832 or empty
+     # we normalize the output during the following so that's e.g. 1 . alpn="h2"
 
      OPENSSL_CONF=""
-     # Read either answer 1) or 2) into raw_https. Should be empty if no such record
+     # Read either answer 1) or 2) into raw_https. Should be empty if there's no such record
      if "$HAS_DIG"; then
           raw_https="$(dig $DIG_R +short +search +timeout=3 +tries=3 $noidnout type65 "$1" 2>/dev/null)"
           # empty if there's no such record
      elif "$HAS_DRILL"; then
-          raw_https="$(drill $1 type65 | awk '/'"^${1}"'.*TYPE65/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
+          raw_https="$(drill $1 type65 | grep -v '^;;' | awk '/'"^${1}"'.*HTTPS/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
           # empty if there's no such record
      elif "$HAS_HOST"; then
           raw_https="$(host -t type65 $1)"
-          if grep -Ewq "has no HTTPS|has no TYPE65" <<< "$raw_https"; then
+          if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
                raw_https=""
           else
-               raw_https="$(sed -e 's/^.*has HTTPS record //' -e 's/^.*has TYPE65 record //' <<< "$raw_https")"
+               raw_https="${raw_https/$1 has HTTPS record /}"
+               raw_https="${raw_https/$1 has TYPE65 record /}"
           fi
      elif "$HAS_NSLOOKUP"; then
           raw_https="$(strip_lf "$(nslookup -type=type65 $1 | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
@@ -21658,15 +21664,13 @@ get_https_rrecord() {
      OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
 
      if [[ -z "$raw_https" ]]; then
-          :
-     elif [[ -n "$raw_https" ]]; then
-         safe_echo "$raw_https"
+          return 1
      elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
-          # now this is binary / hex encoded like \# 10 00010000010003026832
-#FIXME: this probably doesn't work yet and intentionally won't be reached yet
           while read hash len line ;do
-               if [[ "${line:0:2}" == "00" ]]; then                               # probably the https flag, always 00, so we don't keep this
-                    len_https_property=$(printf "%0d" "$((10#${line:2:2}))")      # get len and do type casting, for posteo we have 05 or 09 here as a string
+          #           \#  10  00010000010003026832
+#FIXME: the following doesn't really work
+               if [[ "${line:0:2}" == 00 ]]; then                                 # probably the https flag, always 00, so we don't keep this
+                    len_https_property=$(printf "%0d" "$((10#${line:2:2}))")      # get len and do some kind of type casting
                     len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
                     line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
                     https_property_name="$(hex2ascii ${line:4:$len_https_property})"
@@ -21674,17 +21678,14 @@ get_https_rrecord() {
                     # echo "${https}=${https}"
                     all_https+="${https_property_name}=${https_property_value}\n"
                else
-                    outln "please report unknown CAA RR $line with flag  @ $NODE"
+                    outln "please report unknown HTTPS RR $line with flag @ $NODE"
                     return 7
                fi
           done <<< "$raw_https"
           sort <<< "$(safe_echo "$all_https")"
      else
-          echo "fixme"
+          safe_echo "$raw_https"
      fi
-
-#TODO:
-#    4: check whether $1 is a CNAME and take this
      return 0
 }
 
