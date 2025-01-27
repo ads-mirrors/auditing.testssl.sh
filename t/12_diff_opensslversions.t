@@ -63,9 +63,9 @@ $cat_csvfile  =~  s/ECDH\/MLKEM/ECDH 253  /g;
 $cat_csvfile  =~ s/.nonce-.* //g;
 $cat_csvfile2 =~ s/.nonce-.* //g;
 
-+# Fix IP addresses. needed when we don't hit the same IP address. We just remove them
-$cat_csvfile  =~ s/","google.com\/.*","443/","google.com","443/;
-$cat_csvfile2 =~ s/","google.com\/.*","443/","google.com","443/;
+# Fix IP addresses. Needed when we don't hit the same IP address. We just remove them
+$cat_csvfile  =~ s/","google.com\/.*","443/","google.com","443/g;
+$cat_csvfile2 =~ s/","google.com\/.*","443/","google.com","443/g;
 
 $diff = diff \$cat_csvfile, \$cat_csvfile2;
 
