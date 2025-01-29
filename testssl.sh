@@ -11500,8 +11500,7 @@ starttls_full_read(){
                debugme tmln_out "${debugpad} ${one_line} "
                IFS="${oldIFS}"
                break
-          fi
-          if [[ ! ${one_line} =~ ${cont_pattern} ]]; then
+          elif [[ ! ${one_line} =~ ${cont_pattern} ]]; then
                debugme echo "=== full read syntax error, expected regex pattern ${cont_pattern} (cont) or ${end_pattern} (end) ==="
                IFS="${oldIFS}"
                ret_found=2
@@ -11607,9 +11606,9 @@ starttls_sieve_dialog() {
 
      [[ -n "$1" ]] && starttls="$starttls\r\n$1"            # this adds a payload if supplied
      debugme echo "=== starting sieve STARTTLS dialog ==="
-     starttls_full_read '^"' '^OK '   '"STARTTLS"'          "received server capabilities and checked STARTTLS availability" &&
+     starttls_full_read '^"' '^OK'   '"STARTTLS"'           "received server capabilities and checked STARTTLS availability" &&
      starttls_just_send "$starttls"                         "initiated STARTTLS" &&
-     starttls_full_read '^OK ' '^OK ' ''                    "received ack for STARTTLS"
+     starttls_full_read '^OK' '^OK' ''                      "received ack for STARTTLS"
      ret=$?
      debugme echo "=== finished sieve STARTTLS dialog with ${ret} ==="
      return $ret
