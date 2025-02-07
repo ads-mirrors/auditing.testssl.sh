@@ -7,9 +7,9 @@
 # vulnerabilities or features. It may or may be not distributed by your distribution.
 # The upstream versions are available (please leave the links intact):
 #
-# Development version       https://github.com/drwetter/testssl.sh
+# Development version       https://github.com/testssl/testssl.sh
 # Stable version            https://testssl.sh
-# File bugs at github       https://github.com/drwetter/testssl.sh/issues
+# File bugs at github       https://github.com/testssl/testssl.sh/issues
 #
 # Project lead and initiator: Dirk Wetter, copyleft: 2007-today.
 # Main contributions from David Cooper. Further contributors see CREDITS.md .
