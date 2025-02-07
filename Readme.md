@@ -127,8 +127,8 @@ Please address questions not specifically to the code of testssl.sh to the respe
 * https://github.com/dnmvisser/nagios-testssl (Python 3)
 * https://gitgud.malvager.net/Wazakindjes/icinga2_plugins/src/master/check_testssl.sh (Shell)
 
-#### pentest2xlsx: generate Excelsheets from CSV results
-* https://github.com/AresS31/pentest2xlsx
+#### pentest2xlsx: generate Excel sheets from CSV
+* https://github.com/AresS31/pentest2xlsx (python)
 
 #### Brew package
 
