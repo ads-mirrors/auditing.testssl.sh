@@ -11253,7 +11253,7 @@ npn_pre(){
           fileout "NPN" "WARN" "not tested as proxies do not support proxying it"
           return 1
      fi
-     if ! "$HAS_NPN"; then
+     if "$SSL_NATIVE" && ! "$HAS_NPN"; then
           pr_local_problem "$OPENSSL doesn't support NPN/SPDY";
           fileout "NPN" "WARN" "not tested $OPENSSL doesn't support NPN/SPDY"
           return 7
@@ -11299,13 +11299,24 @@ run_npn() {
           return 0
      fi
 
-     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
-     # TLS13_ONLY is tested here again, just to be sure, see npn_pre
-     if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
-           proto="-no_tls1_3"
+     if "$HAS_NPN"; then
+          # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
+          # TLS13_ONLY is tested here again, just to be sure, see npn_pre
+          if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
+                proto="-no_tls1_3"
+          fi
+          $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
+          [[ $? -ne 0 ]] && ret=1
+     else
+          tls_sockets "03" "$TLS12_CIPHER" "all"
+          ret=$?
+          if [[ $ret -eq 0 ]] || [[ $ret -eq 2 ]]; then
+               ret=0
+          else
+               ret=1
+          fi
+          mv "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" "$TMPFILE"
      fi
-     $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
-     [[ $? -ne 0 ]] && ret=1
      tmpstr="$(grep -a '^Protocols' $TMPFILE | sed 's/Protocols.*: //')"
      if [[ -z "$tmpstr" ]] || [[ "$tmpstr" == " " ]]; then
           outln "not offered"
