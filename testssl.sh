@@ -3050,7 +3050,7 @@ run_cookie_flags() {     # ARG1: Path
      fi
 
      if [[ ! "$HTTP_STATUS_CODE" =~ 20 ]]; then
-          if [[ "$HTTP_STATUS_CODE" =~ [301|302] ]]; then
+          if [[ "$HTTP_STATUS_CODE" =~ 301|302 ]]; then
                msg302=" -- maybe better try target URL of 30x"
                msg302_=" (30x detected, better try target URL of 30x)"
           else
@@ -10181,7 +10181,7 @@ run_npn() {
           fileout "$jsonID" "INFO" "not offered"
      else
           # now comes a strange thing: "Protocols advertised by server:" is empty but connection succeeded
-          if [[ "$tmpstr" =~ [h2|spdy|http] ]]; then
+          if [[ "$tmpstr" =~ h2|spdy|http ]]; then
                out "$tmpstr"
                outln " (advertised)"
                fileout "$jsonID" "INFO" "offered with $tmpstr (advertised)"
@@ -14225,9 +14225,9 @@ run_ccs_injection(){
                fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
           fi
      elif [[ "${tls_hello_ascii:0:4}" == "1503" ]]; then
-          if [[ ! "${tls_hello_ascii:5:2}" =~ [03|02|01|00] ]]; then
+          if [[ ! "${tls_hello_ascii:5:2}" =~ 03|02|01|00 ]]; then
                pr_warning "test failed "
-               out "no proper TLS repy (debug info: protocol sent: 1503${tls_hexcode#x03, x}, reply: ${tls_hello_ascii:0:14}"
+               out "no proper TLS reply (debug info: protocol sent: 1503${tls_hexcode#x03, x}, reply: ${tls_hello_ascii:0:14}"
                fileout "$jsonID" "DEBUG" "test failed, around line $LINENO, debug info (${tls_hello_ascii:0:14})" "$cve" "$cwe" "$hint"
                ret=1
           elif [[ "$byte6" == "15" ]]; then
