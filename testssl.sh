@@ -9637,13 +9637,15 @@ certificate_info() {
      jsonID="cert_certificatePolicies_EV"
      # only the first one, seldom we have two
      policy_oid=$(awk '/ .Policy: / { print $2 }' <<< "$cert_txt" | awk 'NR < 2')
-     if grep -Eq 'Extended Validation|Extended Validated|EV SSL|EV CA' <<< "$issuer" || \
+     if grep -Eq 'Extended Validation|Extended Validated|EV SSL|EV CA|EV TLS' <<< "$issuer" || \
+          [[ 2.23.140.1.1 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114028.10.1.2 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114412.1.3.0.2 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114412.2.1 == "$policy_oid" ]] || \
           [[ 2.16.578.1.26.1.3.3 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.17326.10.14.2.1.2 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.17326.10.8.12.1.2 == "$policy_oid" ]] || \
+          [[ 1.3.6.1.4.1.38064.1.3.1.4 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.13177.10.1.3.10 == "$policy_oid" ]] ; then
           out "yes "
           fileout "${jsonID}${json_postfix}" "OK" "yes"
