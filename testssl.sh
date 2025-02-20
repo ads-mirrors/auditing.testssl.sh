@@ -10873,22 +10873,18 @@ run_fs() {
                          [[ $i -eq $high ]] && break
                          supported_curve[i]=true
                     done
-                    while true; do
-                         # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
-                         # used in the certificate. The easiest solution is to move the curves to the end of the list.
-                         # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
-                         if ((! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]) && [[ ! "$ecdhe_cipher_list" == *RSA* ]]) || break; then
+                    # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+                    # used in the certificate. The easiest solution is to move the curves to the end of the list.
+                    # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
+                    if (! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]) && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
+                         while true; do
                               curves_to_test=""
                               for (( i=low; i < high; i++ )); do
-                                   if ! "${curves_deprecated[i]}"; then
-                                        "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
-                                   fi
+                                   "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
                               done
                               [[ -z "$curves_to_test" ]] && break
                               for (( i=low; i < high; i++ )); do
-                                   if ! "${curves_deprecated[i]}"; then
-                                        "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
-                                   fi
+                                   "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
                               done
                               $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                               sclient_connect_successful $? $TMPFILE || break
@@ -10909,8 +10905,8 @@ run_fs() {
                               done
                               [[ $i -eq $high ]] && break
                               supported_curve[i]=true
-                         fi
-                    done
+                         done
+                    fi
                done
           done
      fi
@@ -10950,19 +10946,15 @@ run_fs() {
                # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
                # used in the certificate. The easiest solution is to move the curves to the end of the list.
                # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
-               while true; do
-                    if ([[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]) || break; then
+               if ([[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]); then
+                    while true; do
                          curves_to_test=""
                          for (( i=0; i < nr_curves; i++ )); do
-                              if ! "${curves_deprecated[i]}" || [[ "$proto" == 03 ]]; then
-                                   ! "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
-                              fi
+                              ! "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
                          done
                          [[ -z "$curves_to_test" ]] && break
                          for (( i=0; i < nr_curves; i++ )); do
-                              if ! "${curves_deprecated[i]}" || [[ "$proto" == 03 ]]; then
-                                   "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
-                              fi
+                              "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
                          done
                          len1=$(printf "%02x" "$((2*${#curves_to_test}/7))")
                          len2=$(printf "%02x" "$((2*${#curves_to_test}/7+2))")
@@ -10980,8 +10972,8 @@ run_fs() {
                          done
                          [[ $i -eq $nr_curves ]] && break
                          supported_curve[i]=true
-                    fi
-               done
+                    done
+               fi
           done
      fi
      if "$ecdhe_offered"; then
