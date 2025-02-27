@@ -5216,7 +5216,7 @@ run_client_simulation() {
                     fi
                     if [[ $sclient_success -eq 0 ]]; then
                          # If an ephemeral DH key was used, check that the number of bits is within range.
-                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")        # extract line
+                         temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key/ { print $2 }' "$TMPFILE")        # extract line
                          what_dh="${temp%%,*}"
                          bits="${temp##*, }"
                          # formatting
@@ -6706,7 +6706,7 @@ pr_cipher_quality() {
 read_dhtype_from_file() {
      local temp kx
 
-     temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$1")        # extract line
+     temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$1")        # extract line
      kx="Kx=${temp%%,*}"
      [[ "$kx" == "Kx=X25519" ]] && kx="Kx=ECDH"
      [[ "$kx" == "Kx=X448" ]] && kx="Kx=ECDH"
@@ -6739,7 +6739,7 @@ read_dhbits_from_file() {
      local add=""
      local old_fart=" (your $OPENSSL cannot show DH bits)"
 
-     temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$1")        # extract line
+     temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$1")        # extract line
      what_dh="${temp%%,*}"
      bits="${temp##*, }"
      curve="${temp#*, }"
@@ -10910,7 +10910,7 @@ run_fs() {
                          [[ -z "$curves_to_test" ]] && break
                          $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                          sclient_connect_successful $? $TMPFILE || break
-                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                         temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$TMPFILE")
                          curve_found="${temp%%,*}"
                          if [[ "$curve_found" == ECDH ]]; then
                               curve_found="${temp#*, }"
@@ -10943,7 +10943,7 @@ run_fs() {
                               done
                               $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
                               sclient_connect_successful $? $TMPFILE || break
-                              temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                              temp=$(awk -F': ' '/^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group/ { print $2 }' "$TMPFILE")
                               curve_found="${temp%%,*}"
                               if [[ "$curve_found" == ECDH ]]; then
                                    curve_found="${temp#*, }"
@@ -22354,7 +22354,7 @@ determine_optimal_proto() {
 
           debugme echo "OPTIMAL_PROTO: $OPTIMAL_PROTO"
      fi
-     [[ "$optimal_proto" != -ssl2 ]]  && ! "$all_failed" && grep -q '^Server Temp Key' $TMPFILE && HAS_DH_BITS=true     # FIX #190
+     [[ "$optimal_proto" != -ssl2 ]]  && ! "$all_failed" && grep -Eq '^Server Temp Key|^Peer Temp Key|^Negotiated TLS1.3 group' $TMPFILE && HAS_DH_BITS=true     # FIX #190
      if [[ "$(has_server_protocol "tls1_3")" -eq 0 ]] && [[ "$(has_server_protocol "tls1_2")" -ne 0 ]] &&
         [[ "$(has_server_protocol "tls1_1")" -ne 0 ]] && [[ "$(has_server_protocol "tls1")" -ne 0 ]] &&
         [[ "$(has_server_protocol "ssl3")" -ne 0 ]]; then
