@@ -2083,7 +2083,7 @@ check_revocation_ocsp() {
           if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
                host_header="-header Host ${host_header}"
           elif [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.0* ]] || [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* ]] || \
-               [[ $OSSL_VER_MAJOR == 3 ]]; then
+               [[ $OSSL_VER_MAJOR -ge 3 ]]; then
                host_header="-header Host=${host_header}"
           else
                host_header="-header Host ${host_header}"
@@ -4443,7 +4443,7 @@ ciphers_by_strength() {
                ossl_ciphers_proto=""
           elif [[ $proto == -ssl2 ]] || [[ $proto == -ssl3 ]] || \
                [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.0* ]] || [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* ]] || \
-               [[ $OSSL_VER_MAJOR == 3 ]]; then
+               [[ $OSSL_VER_MAJOR -ge 3 ]]; then
                ossl_ciphers_proto="$proto"
           else
                ossl_ciphers_proto="-tls1"
@@ -6852,7 +6852,7 @@ sub_session_resumption() {
           fi
      fi
      if "$byID" && [[ ! "$OSSL_NAME" =~ LibreSSL ]] && \
-        [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* || $OSSL_VER_MAJOR == 3 ]] && \
+        [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* || $OSSL_VER_MAJOR -ge 3 ]] && \
         [[ ! -s "$sess_data" ]]; then
           # it seems OpenSSL indicates no Session ID resumption by just not generating output
           debugme echo -n "No session resumption byID (empty file)"
@@ -7706,15 +7706,13 @@ determine_trust() {
      # and the output should should be indented by two more spaces.
      [[ -n $json_postfix ]] && spaces="                                "
 
-     case $OSSL_VER_MAJOR.$OSSL_VER_MINOR in
-          1.0.2|1.1.0|1.1.1|2.[1-9].*|3.*|4.*)           # 2.x is LibreSSL. 2.1.1 was tested to work, below is not sure
-               :
-          ;;
-          *)   addtl_warning="Your $OPENSSL <= 1.0.2 might be too unreliable to determine trust"
-               fileout "${jsonID}${json_postfix}" "WARN" "$addtl_warning"
-               addtl_warning="(${addtl_warning})"
-          ;;
-     esac
+     if [[ $OSSL_VER_MAJOR -lt 3 ]] && [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 1.0.2 ]] && \
+        [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 1.1.* ]] && [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" != 2.[1-9].* ]]; then
+          # 2.x is LibreSSL. 2.1.1 was tested to work, below is not sure
+          addtl_warning="Your $OPENSSL <= 1.0.2 might be too unreliable to determine trust"
+          fileout "${jsonID}${json_postfix}" "WARN" "$addtl_warning"
+          addtl_warning="(${addtl_warning})"
+     fi
      debugme tmln_out
 
      # if you run testssl.sh from a different path /you can set either TESTSSL_INSTALL_DIR or CA_BUNDLES_PATH to find the CA BUNDLES
@@ -12503,7 +12501,7 @@ hmac() {
      local key="$2" text="$3" output
      local -i ret
 
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR == 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR -ge 3 ]]; then
           output="$(hex2binary "$text" | $OPENSSL mac -macopt digest:"${hash_fn/-/}" -macopt hexkey:"$key" HMAC 2>/dev/null)"
           ret=$?
           tm_out "$(strip_lf "$output")"
@@ -12524,7 +12522,7 @@ hmac-transcript() {
      local key="$2" transcript="$3" output
      local -i ret
 
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR == 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ $OSSL_VER_MAJOR -ge 3 ]]; then
           output="$(hex2binary "$transcript" | \
                     $OPENSSL dgst "$hash_fn" -binary 2>/dev/null | \
                     $OPENSSL mac -macopt digest:"${hash_fn/-/}" -macopt hexkey:"$key" HMAC 2>/dev/null)"
@@ -20477,9 +20475,9 @@ find_openssl_binary() {
      OSSL_NAME=${OSSL_NAME//  /}
 
      # see #190, reverting logic: unless otherwise proved openssl has no dh bits
-     case "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" in
-          1.0.2|1.1.0|1.1.1|3.*) HAS_DH_BITS=true ;;
-     esac
+     if [[ $OSSL_VER_MAJOR -ge 3 ]] || [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" == 1.1.* ]] || [[ "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" == 1.0.2 ]]; then
+          HAS_DH_BITS=true
+     fi
 
      OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
 
@@ -20625,7 +20623,7 @@ find_openssl_binary() {
      # not check /usr/bin/openssl -- if available. This is more a kludge which we shouldn't use for
      # every openssl feature. At some point we need to decide which with openssl version we go.
      # We also check, whether there's /usr/bin/openssl which has TLS 1.3
-     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ ! $OSSL_VER_MAJOR =~ 3 ]]; then
+     if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
           if [[ -x $OPENSSL2 ]]; then
                $OPENSSL2 s_client -help 2>$s_client_has2
                $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
