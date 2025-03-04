@@ -17037,7 +17037,7 @@ run_ticketbleed() {
           "$HAS_TLS13" && tls_proto="-no_tls1_3"
           $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS $tls_proto -connect $NODEIP:$PORT $PROXY") >$TMPFILE 2>$ERRFILE </dev/null
           sclient_connect_successful $? "$TMPFILE"
-          if [$? -ne 0 ]]; then
+          if [[ $? -ne 0 ]]; then
                prln_warning "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT"
                fileout "$jsonID" "WARN" "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT."
                return 1
