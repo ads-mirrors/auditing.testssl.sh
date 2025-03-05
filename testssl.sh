@@ -20500,7 +20500,7 @@ find_openssl_binary() {
           HAS_CURVES=true
           for curve in "${curves_ossl[@]}"; do
                # Same as above, we just don't need a port for invalid.
-               #FIXME: openssl 3 sometimes seems somtimes to hang  when using '-connect invalid.' for up to 10 seconds
+               #FIXME: openssl 3 sometimes seems to hang  when using '-connect invalid.' for up to 10 seconds
                $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|cannot be set"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
           done
