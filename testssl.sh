@@ -3370,7 +3370,7 @@ run_cookie_flags() {     # ARG1: Path
      fi
 
      if [[ ! "$HTTP_STATUS_CODE" =~ 20 ]]; then
-          if [[ "$HTTP_STATUS_CODE" =~ [301|302] ]]; then
+          if [[ "$HTTP_STATUS_CODE" =~ 301|302 ]]; then
                msg302=" -- maybe better try target URL of 30x"
                msg302_=" (30x detected, better try target URL of 30x)"
           else
@@ -9637,13 +9637,15 @@ certificate_info() {
      jsonID="cert_certificatePolicies_EV"
      # only the first one, seldom we have two
      policy_oid=$(awk '/ .Policy: / { print $2 }' <<< "$cert_txt" | awk 'NR < 2')
-     if grep -Eq 'Extended Validation|Extended Validated|EV SSL|EV CA' <<< "$issuer" || \
+     if grep -Eq 'Extended Validation|Extended Validated|EV SSL|EV CA|EV TLS' <<< "$issuer" || \
+          [[ 2.23.140.1.1 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114028.10.1.2 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114412.1.3.0.2 == "$policy_oid" ]] || \
           [[ 2.16.840.1.114412.2.1 == "$policy_oid" ]] || \
           [[ 2.16.578.1.26.1.3.3 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.17326.10.14.2.1.2 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.17326.10.8.12.1.2 == "$policy_oid" ]] || \
+          [[ 1.3.6.1.4.1.38064.1.3.1.4 == "$policy_oid" ]] || \
           [[ 1.3.6.1.4.1.13177.10.1.3.10 == "$policy_oid" ]] ; then
           out "yes "
           fileout "${jsonID}${json_postfix}" "OK" "yes"
@@ -10926,6 +10928,40 @@ run_fs() {
                          [[ $i -eq $high ]] && break
                          supported_curve[i]=true
                     done
+                    # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+                    # used in the certificate. The easiest solution is to move the curves to the end of the list.
+                    # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
+                    if { ! "$HAS_TLS13" || [[ "$proto" == "-no_tls1_3" ]]; } && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
+                         while true; do
+                              curves_to_test=""
+                              for (( i=low; i < high; i++ )); do
+                                   "${ossl_supported[i]}" && ! "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
+                              done
+                              [[ -z "$curves_to_test" ]] && break
+                              for (( i=low; i < high; i++ )); do
+                                   "${supported_curve[i]}" && curves_to_test+=":${curves_ossl[i]}"
+                              done
+                              $OPENSSL s_client $(s_client_options "$proto -cipher "\'${ecdhe_cipher_list:1}\'" -ciphersuites "\'${tls13_cipher_list:1}\'" -curves "${curves_to_test:1}" $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") &>$TMPFILE </dev/null
+                              sclient_connect_successful $? $TMPFILE || break
+                              temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TMPFILE")
+                              curve_found="${temp%%,*}"
+                              if [[ "$curve_found" == ECDH ]]; then
+                                   curve_found="${temp#*, }"
+                                   curve_found="${curve_found%%,*}"
+                                   if "$HAS_TLS13" && [[ ! "$proto" == "-no_tls1_3" ]] && [[ "$curve_found" == brainpoolP[235][581][642]r1 ]]; then
+                                        [[ "$(get_protocol "$TMPFILE")" == TLSv1.3 ]] && curve_found+="tls13"
+                                   fi
+                              fi
+                              for (( i=low; i < high; i++ )); do
+                                   if ! "${supported_curve[i]}"; then
+                                        [[ "${curves_ossl_output[i]}" == "$curve_found" ]] && break
+                                        [[ "${curves_ossl[i]}" == "$curve_found" ]] && break
+                                   fi
+                              done
+                              [[ $i -eq $high ]] && break
+                              supported_curve[i]=true
+                         done
+                    fi
                done
           done
      fi
@@ -10962,6 +10998,37 @@ run_fs() {
                     [[ $i -eq $nr_curves ]] && break
                     supported_curve[i]=true
                done
+               # Versions of TLS prior to 1.3 close the connection if the client does not support the curve
+               # used in the certificate. The easiest solution is to move the curves to the end of the list.
+               # instead of removing them from the ClientHello. This is only needed if there is no RSA certificate.
+               if [[ "$proto" == 03 ]] && [[ ! "$ecdhe_cipher_list" == *RSA* ]]; then
+                    while true; do
+                         curves_to_test=""
+                         for (( i=0; i < nr_curves; i++ )); do
+                              ! "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
+                         done
+                         [[ -z "$curves_to_test" ]] && break
+                         for (( i=0; i < nr_curves; i++ )); do
+                              "${supported_curve[i]}" && curves_to_test+=", ${curves_hex[i]}"
+                         done
+                         len1=$(printf "%02x" "$((2*${#curves_to_test}/7))")
+                         len2=$(printf "%02x" "$((2*${#curves_to_test}/7+2))")
+                         tls_sockets "$proto" "${ecdhe_cipher_list_hex:2}, 00,ff" "ephemeralkey" "00, 0a, 00, $len2, 00, $len1, ${curves_to_test:2}"
+                         sclient_success=$?
+                         [[ $sclient_success -ne 0 ]] && [[ $sclient_success -ne 2 ]] && break
+                         temp=$(awk -F': ' '/^Server Temp Key/ { print $2 }' "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt")
+                         curve_found="${temp%%,*}"
+                         if [[ "$curve_found" == "ECDH" ]]; then
+                              curve_found="${temp#*, }"
+                              curve_found="${curve_found%%,*}"
+                         fi
+                         for (( i=0; i < nr_curves; i++ )); do
+                              ! "${supported_curve[i]}" && [[ "${curves_ossl_output[i]}" == "$curve_found" ]] && break
+                         done
+                         [[ $i -eq $nr_curves ]] && break
+                         supported_curve[i]=true
+                    done
+               fi
           done
      fi
      if "$ecdhe_offered"; then
@@ -11253,7 +11320,7 @@ npn_pre(){
           fileout "NPN" "WARN" "not tested as proxies do not support proxying it"
           return 1
      fi
-     if ! "$HAS_NPN"; then
+     if "$SSL_NATIVE" && ! "$HAS_NPN"; then
           pr_local_problem "$OPENSSL doesn't support NPN/SPDY";
           fileout "NPN" "WARN" "not tested $OPENSSL doesn't support NPN/SPDY"
           return 7
@@ -11299,20 +11366,31 @@ run_npn() {
           return 0
      fi
 
-     # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
-     # TLS13_ONLY is tested here again, just to be sure, see npn_pre
-     if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
-           proto="-no_tls1_3"
+     if "$HAS_NPN"; then
+          # TLS 1.3 s_client doesn't support -nextprotoneg when connecting with TLS 1.3. So we need to make sure it won't be used
+          # TLS13_ONLY is tested here again, just to be sure, see npn_pre
+          if "$HAS_TLS13" && ! $TLS13_ONLY ]] ; then
+                proto="-no_tls1_3"
+          fi
+          $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
+          [[ $? -ne 0 ]] && ret=1
+     else
+          tls_sockets "03" "$TLS12_CIPHER" "all"
+          ret=$?
+          if [[ $ret -eq 0 ]] || [[ $ret -eq 2 ]]; then
+               ret=0
+          else
+               ret=1
+          fi
+          mv "$TEMPDIR/$NODEIP.parse_tls_serverhello.txt" "$TMPFILE"
      fi
-     $OPENSSL s_client $(s_client_options "$proto -connect $NODEIP:$PORT $BUGS $SNI -nextprotoneg "$NPN_PROTOs"") </dev/null 2>$ERRFILE >$TMPFILE
-     [[ $? -ne 0 ]] && ret=1
      tmpstr="$(grep -a '^Protocols' $TMPFILE | sed 's/Protocols.*: //')"
      if [[ -z "$tmpstr" ]] || [[ "$tmpstr" == " " ]]; then
           outln "not offered"
           fileout "$jsonID" "INFO" "not offered"
      else
           # now comes a strange thing: "Protocols advertised by server:" is empty but connection succeeded
-          if [[ "$tmpstr" =~ [h2|spdy|http] ]]; then
+          if [[ "$tmpstr" =~ h2|spdy|http ]]; then
                out "$tmpstr"
                outln " (advertised)"
                fileout "$jsonID" "INFO" "offered with $tmpstr (advertised)"
@@ -16854,7 +16932,7 @@ run_ccs_injection(){
                fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
           fi
      elif [[ "${tls_hello_ascii:0:4}" == "1503" ]]; then
-          if [[ ! "${tls_hello_ascii:5:2}" =~ [03|02|01|00] ]]; then
+          if [[ ! "${tls_hello_ascii:5:2}" =~ 03|02|01|00 ]]; then
                pr_warning "test failed "
                out "no proper TLS reply (debug info: protocol sent: 1503${tls_hexcode#x03, x}, reply: ${tls_hello_ascii:0:14}"
                fileout "$jsonID" "DEBUG" "test failed, around line $LINENO, debug info (${tls_hello_ascii:0:14})" "$cve" "$cwe" "$hint"
@@ -16907,25 +16985,11 @@ run_ccs_injection(){
      return $ret
 }
 
-sub_session_ticket_tls() {
-     local tls_proto="$1"
-     local sessticket_tls=""
-     #FIXME: we likely have done this already before (either @ run_server_defaults() or at least the output
-     #       from a previous handshake) --> would save 1x connect. We have TLS_TICKET but not yet the ticket itself #FIXME
-     #ATTENTION: we DO NOT use SNI here as we assume ticketbleed is a vulnerability of the TLS stack. If we'd do SNI here, we'd also need
-     #           it in the ClientHello of run_ticketbleed() otherwise the ticket will be different and the whole thing won't work!
-     #
-     sessticket_tls="$($OPENSSL s_client $(s_client_options "$BUGS $tls_proto $PROXY $SNI -connect $NODEIP:$PORT") </dev/null 2>$ERRFILE | awk '/TLS session ticket:/,/^$/' | awk '!/TLS session ticket/')"
-     sessticket_tls="$(sed -e 's/^.* - /x/g' -e 's/  .*$//g' <<< "$sessticket_tls" | tr '\n' ',')"
-     sed -e 's/ /,x/g' -e 's/-/,x/g' <<< "$sessticket_tls"
-
-}
-
 
 # see https://blog.filippo.io/finding-ticketbleed/ |  https://filippo.io/ticketbleed/
 run_ticketbleed() {
      local tls_hexcode tls_proto=""
-     local session_tckt_tls=""
+     local sessticket_tls="" session_tckt_tls=""
      local -i len_ch=300                            # fixed len of prepared clienthello below
      local sid="x00,x0B,xAD,xC0,xDE,x00,"           # some arbitrary bytes
      local len_sid="$(( ${#sid} / 4))"
@@ -16961,17 +17025,23 @@ run_ticketbleed() {
           return 0
      fi
 
-     if [[ 0 -eq $(has_server_protocol tls1) ]]; then
-          tls_hexcode="x03, x01"; tls_proto="-tls1"
+     if [[ 0 -eq $(has_server_protocol tls1_2) ]]; then
+          tls_hexcode="x03, x03"; tls_proto="-tls1_2"
      elif [[ 0 -eq $(has_server_protocol tls1_1) ]]; then
           tls_hexcode="x03, x02"; tls_proto="-tls1_1"
-     elif [[ 0 -eq $(has_server_protocol tls1_2) ]]; then
-          tls_hexcode="x03, x03"; tls_proto="-tls1_2"
+     elif [[ 0 -eq $(has_server_protocol tls1) ]]; then
+          tls_hexcode="x03, x01"; tls_proto="-tls1"
      elif [[ 0 -eq $(has_server_protocol ssl3) ]]; then
           tls_hexcode="x03, x00"; tls_proto="-ssl3"
      else # no protocol for some reason defined, determine TLS versions offered with a new handshake
           "$HAS_TLS13" && tls_proto="-no_tls1_3"
           $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS $tls_proto -connect $NODEIP:$PORT $PROXY") >$TMPFILE 2>$ERRFILE </dev/null
+          sclient_connect_successful $? "$TMPFILE"
+          if [[ $? -ne 0 ]]; then
+               prln_warning "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT"
+               fileout "$jsonID" "WARN" "Cannot test for ticketbleed. Your OpenSSL cannot connect to $NODEIP:$PORT."
+               return 1
+          fi
           case "$(get_protocol $TMPFILE)" in
                *1.2)  tls_hexcode="x03, x03"; tls_proto="-tls1_2" ; add_proto_offered tls1_2 yes ;;
                *1.1)  tls_hexcode="x03, x02"; tls_proto="-tls1_1" ; add_proto_offered tls1_1 yes ;;
@@ -16979,9 +17049,26 @@ run_ticketbleed() {
                SSLv3) tls_hexcode="x03, x00"; tls_proto="-ssl3" ; add_proto_offered ssl3 yes ;;
           esac
      fi
+     if ! sclient_supported "$tls_proto"; then
+          prln_local_problem "Cannot test for ticketbleed. $OPENSSL doesn't support \"s_client $tls_proto\"."
+          fileout "$jsonID" "WARN" "Cannot test for ticketbleed. $OPENSSL doesn't support \"s_client $tls_proto\"."
+          return 1
+     fi
      debugme echo "using protocol $tls_hexcode"
 
-     session_tckt_tls="$(sub_session_ticket_tls "$tls_proto")"
+     #FIXME: we likely have done this already before (either @ run_server_defaults() or at least the output
+     #       from a previous handshake) --> would save 1x connect. We have TLS_TICKET but not yet the ticket itself #FIXME
+     #
+     $OPENSSL s_client $(s_client_options "$BUGS $tls_proto $PROXY $SNI -connect $NODEIP:$PORT") </dev/null >$TMPFILE 2>$ERRFILE
+     sclient_connect_successful $? "$TMPFILE"
+     if [[ $? -ne 0 ]]; then
+          prln_warning "$OPENSSL unable to connect to $NODEIP:$PORT when testing for ticketbleed."
+          fileout "$jsonID" "WARN" "$OPENSSL unable to connect to $NODEIP:$PORT when testing for ticketbleed."
+          return 1
+     fi
+     sessticket_tls="$(awk '/TLS session ticket:/,/^$/' "$TMPFILE" | awk '!/TLS session ticket/')"
+     sessticket_tls="$(sed -e 's/^.* - /x/g' -e 's/  .*$//g' <<< "$sessticket_tls" | tr '\n' ',')"
+     session_tckt_tls="$(sed -e 's/ /,x/g' -e 's/-/,x/g' <<< "$sessticket_tls")"
      if [[ "$session_tckt_tls" == "," ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no session tickets"
@@ -20501,7 +20588,7 @@ find_openssl_binary() {
           for curve in "${curves_ossl[@]}"; do
                # Same as above, we just don't need a port for invalid.
                #FIXME: openssl 3 sometimes seems to hang  when using '-connect invalid.' for up to 10 seconds
-               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|cannot be set"
+               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Call to SSL_CONF_cmd(.*) failed|cannot be set"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
           done
      fi
@@ -20820,7 +20907,7 @@ file output options (can also be preset via environment variables)
      --html                        additional output as HTML to file '\${NODE}-p\${port}\${YYYYMMDD-HHMM}.html'
      --htmlfile|-oH <htmlfile>     additional output as HTML to the specified file or directory, similar to --logfile
      --out(f,F)ile|-oa/-oA <fname> log to a LOG,JSON,CSV,HTML file (see nmap). -oA/-oa: pretty/flat JSON.
-                                   "auto" uses '\${NODE}-p\${port}\${YYYYMMDD-HHMM}'. If fname if a dir uses 'dir/\${NODE}-p\${port}\${YYYYMMDD-HHMM}'
+                                   "auto" uses '\${NODE}-p\${port}\${YYYYMMDD-HHMM}'. If fname is a dir uses 'dir/\${NODE}-p\${port}\${YYYYMMDD-HHMM}'
      --hints                       additional hints to findings
      --severity <severity>         severities with lower level will be filtered for CSV+JSON, possible values <LOW|MEDIUM|HIGH|CRITICAL>
      --append                      if (non-empty) <logfile>, <csvfile>, <jsonfile> or <htmlfile> exists, append to file. Omits any header
@@ -23428,6 +23515,7 @@ set_rating_state() {
           return 1
      fi
 
+     do_rating=true
      return 0
 }
 
@@ -23566,10 +23654,10 @@ set_skip_tests() {
 # arg2: value (if no = provided)
 parse_opt_equal_sign() {
      if [[ "$1" == *=* ]]; then
-          echo ${1#*=}
+          safe_echo "${1#*=}"
           return 1  # = means we don't need to shift args!
      else
-          echo "$2"
+          safe_echo "${2}"
           return 0  # we need to shift
      fi
 }
@@ -24226,13 +24314,16 @@ parse_cmd_line() {
      [[ $CMDLINE_IP == one ]] && ( is_ipv4addr "$URI" || is_ipv6addr "$URI" )  && fatal_cmd_line "\"--ip=one\" plus supplying an IP address doesn't work" $ERR_CMDLINE
      "$do_mx_all_ips" && [[ "$NODNS" == none ]] && fatal_cmd_line "\"--mx\" and \"--nodns=none\" don't work together" $ERR_CMDLINE
 
-     if [[ -d $ADDTL_CA_FILES ]]; then
+     if [[ "${ADDTL_CA_FILES}" =~ \  ]]; then
+          fatal_cmd_line "The CA file \"${ADDTL_CA_FILES}\" must not contain spaces" $ERR_RESOURCE
+     fi
+     if [[ -d "${ADDTL_CA_FILES}" ]]; then
           ADDTL_CA_FILES="$ADDTL_CA_FILES/*.pem"
      else
           ADDTL_CA_FILES="${ADDTL_CA_FILES//,/ }"
      fi
-     for fname in $ADDTL_CA_FILES; do
-          [[ -s "$fname" ]] || fatal_cmd_line "CA file \"$fname\" does not exist" $ERR_RESOURCE
+     for fname in ${ADDTL_CA_FILES}; do
+          [[ -s "$fname" ]] || fatal_cmd_line "The CA file \"$fname\" does not exist" $ERR_RESOURCE
           grep -q 'BEGIN CERTIFICATE' "$fname" || fatal_cmd_line "\"$fname\" is not CA file in PEM format" $ERR_RESOURCE
      done
 
