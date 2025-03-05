@@ -3512,7 +3512,7 @@ prettyprint_local() {
      fi
 
      if [[ -z "$1" ]]; then
-          pr_headline " Displaying all $OPENSSL_NR_CIPHERS local ciphers ";
+          pr_headline " Displaying all $OPENSSL_NR_CIPHERS local OpenSSL ciphers ";
      else
           pr_headline " Displaying all local ciphers ";
           # pattern provided; which one?
@@ -20345,25 +20345,25 @@ find_openssl_binary() {
           fi
      fi
 
-     # https://www.openssl.org/news/changelog.html
-     # https://web.archive.org/web/20150815130800/http://openssl.org/news/openssl-notes.html
-     OSSL_NAME=$($OPENSSL version 2>/dev/null | awk '{ print $1 }')
-     OSSL_VER=$($OPENSSL version 2>/dev/null | awk -F' ' '{ print $2 }')
+     $OPENSSL version -a 2>/dev/null >$TEMPDIR/openssl_version_all
+     ossl_line1=$(head -1 $TEMPDIR/openssl_version_all)
+     OSSL_NAME=$(awk '{ print $1 }' <<< "${ossl_line1}")
+     OSSL_VER=$(awk -F' ' '{ print $2 }' <<< "${ossl_line1}")
      OSSL_VER_MAJOR="${OSSL_VER%%\.*}"
-     ossl_wo_dev_info="${OSSL_VER%%-*}"
-     OSSL_VER_MINOR="${ossl_wo_dev_info#$OSSL_VER_MAJOR\.}"
+     OSSL_VER_MINOR="${OSSL_VER%%-*}"
+     OSSL_VER_MINOR="${OSSL_VER_MINOR#$OSSL_VER_MAJOR\.}"
      OSSL_VER_MINOR="${OSSL_VER_MINOR%%[a-zA-Z]*}"
+     # like -bad -fips etc:
      OSSL_VER_APPENDIX="${OSSL_VER#$OSSL_VER_MAJOR\.$OSSL_VER_MINOR}"
-     OSSL_VER_PLATFORM=$($OPENSSL version -p 2>/dev/null | sed 's/^platform: //')
-     OSSL_BUILD_DATE=$($OPENSSL version -a 2>/dev/null | grep '^built' | sed -e 's/built on//' -e 's/: ... //' -e 's/: //' -e 's/ UTC//' -e 's/ +0000//' -e 's/.000000000//')
+     OSSL_VER_PLATFORM="$(awk '/^platform: / { print $2 }' < $TEMPDIR/openssl_version_all)"
+     OSSL_BUILD_DATE="$(awk '/^built on/' < $TEMPDIR/openssl_version_all)"
+     OSSL_BUILD_DATE=${OSSL_BUILD_DATE#*: }
 
-     # Determine an OpenSSL short string for the banner
-     # E.g MacOS' homebrew and Debian add a library string: OpenSSL 3.3.1 4 Jun 2024 (Library: OpenSSL 3.3.1 4 Jun 2024),
+     # MacOS' homebrew and Debian add a library string: OpenSSL 3.3.1 4 Jun 2024 (Library: OpenSSL 3.3.1 4 Jun 2024),
      # so we omit the part after the round bracket as it breaks formatting and doesn't provide more useful info
-     OSSL_SHORT_STR=$($OPENSSL version 2>/dev/null)
-     OSSL_SHORT_STR=${OSSL_SHORT_STR%\(*}
-     # Now handle strings like this: OpenSSL 1.1.1l-fips  24 Aug 2021 SUSE release 150500.17.34.1
-     # we find the year, remove until first occurrence, re-add it
+     OSSL_SHORT_STR=${ossl_line1%\(*}
+     # Now handle strings like "OpenSSL 1.1.1l-fips  24 Aug 2021 SUSE release 150500.17.34.1". So we look for
+     # the year, remove it until the end and then re-add just the year
      for yr in {2014..2029} ; do
           if [[ $OSSL_SHORT_STR =~ \ $yr ]] ; then
                OSSL_SHORT_STR=${OSSL_SHORT_STR%%$yr*}
@@ -20371,6 +20371,22 @@ find_openssl_binary() {
                break
           fi
      done
+     # Now OSSL_SHORT_STR contains for newer binaries "OpenSSL 3.3.1 4 Jun 2024" and for the supplied "OpenSSL 1.0.2-bad".
+     # Now, determine the build date if there is one, Opensuse doesn't seem to have one, then we pick the date instead from the first line
+     if [[ -z ${OSSL_BUILD_DATE} ]]; then
+         # determine date from the form. And take that as a built date internally
+         OSSL_NAME=${OSSL_SHORT_STR/?? ??? 20??/}
+         OSSL_BUILD_DATE=${OSSL_SHORT_STR/$OSSL_NAME/}
+     else
+         # Remove TZ
+         OSSL_BUILD_DATE=${OSSL_BUILD_DATE/UTC/}
+     fi
+     # opensuse e.g. has also the version in the name which we don't want there
+     OSSL_NAME=${OSSL_NAME/$OSSL_VER/}
+     # Reduce double spaces to just one and remove trailing space
+     OSSL_BUILD_DATE=${OSSL_BUILD_DATE/  / }
+     OSSL_BUILD_DATE="$(strip_trailing_space "$OSSL_BUILD_DATE")"
+     OSSL_NAME=${OSSL_NAME//  /}
 
      # see #190, reverting logic: unless otherwise proved openssl has no dh bits
      case "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" in
@@ -20470,13 +20486,11 @@ find_openssl_binary() {
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
 
      OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
-
      # The following statement works with OpenSSL 1.0.2, 1.1.1 and 3.0 and LibreSSL 3.4
      if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
-          # This is e.g. for LibreSSL (tested with version 3.4.1): WSL users will get "127.0.0.1:0" here,
-          # all other "invalid.:0". We need a port here, in any case!
-          # The $OPENSSL connect call deliberately fails: when the curve isn't available with
-          # "getaddrinfo: Name or service not known", newer LibreSSL with "Failed to set groups".
+          # LibreSSL (tested with version 3.4.1 and 3.0.2) need -groups instead of -curve
+          # WSL users connect to "127.0.0.1:0", others to "invalid." or "invalid.:0"
+          # The $OPENSSL connect call deliberately fails: when the curve isn't available with the described error messages
           for curve in "${curves_ossl[@]}"; do
                $OPENSSL s_client -groups $curve -connect ${NXCONNECT%:*}:0 </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|Failed to set groups"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
@@ -20485,7 +20499,8 @@ find_openssl_binary() {
           HAS_CURVES=true
           for curve in "${curves_ossl[@]}"; do
                # Same as above, we just don't need a port for invalid.
-               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option"
+               #FIXME: openssl 3 sometimes seems somtimes to hang  when using '-connect invalid.' for up to 10 seconds
+               $OPENSSL s_client -curves $curve -connect $NXCONNECT </dev/null 2>&1 | grep -Eiaq "Error with command|unknown option|cannot be set"
                [[ $? -ne 0 ]] && OSSL_SUPPORTED_CURVES+=" $curve "
           done
      fi
@@ -20712,7 +20727,7 @@ help() {
   and [options] is/are:
 
      -t, --starttls <protocol>     Does a run against a STARTTLS enabled service which is one of ftp, smtp, lmtp, pop3, imap,
-                                   sieve, xmpp, xmpp-server, telnet, ldap, nntp, postgres, mysql
+                                   xmpp, xmpp-server, telnet, ldap, nntp, sieve, postgres, mysql
      --xmpphost <to_domain>        For STARTTLS xmpp or xmpp-server checks it supplies the domainname (like SNI)
      --mx <domain/host>            Tests MX records from high to low priority (STARTTLS, port 25)
      --file/-iL <fname>            Mass testing option: Reads one testssl.sh command line per line from <fname>.
@@ -21012,11 +21027,11 @@ prepare_arrays() {
 mybanner() {
      local bb1 bb2 bb3
      local spaces="  "
-     local full="$1"
+     local full="$1"                         # we have a short version and a longer one (two liner vs 4 liner)
+     local short_built_date=""               # a reduced version of the build date in the short banner
 
      "$QUIET" && return
      "$CHILD_MASS_TESTING" && return
-     OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL:@STRENGTH' 'ALL')")
      bb1=$(cat <<EOF
 
 #####################################################################
@@ -21030,7 +21045,6 @@ EOF
 EOF
 )
    bb3=$(cat <<EOF
-
 #####################################################################
 EOF
 )
@@ -21047,8 +21061,14 @@ EOF
      pr_boldurl "https://testssl.sh/bugs/"; outln
      pr_bold "$bb3"
      outln "\n"
+
+     # remove clock and dow if the first word if it is a dow and not a dom (suse)
+     short_built_date=${OSSL_BUILD_DATE/??:??:?? /}
+     if [[ ${short_built_date%% *} =~ [A-Za-z]{3} ]]; then
+        short_built_date=${short_built_date#* }
+     fi
      out "${spaces}Using "
-     pr_italic "$OSSL_SHORT_STR"
+     pr_italic "$OSSL_NAME $OSSL_VER ($short_built_date)"
      outln "  [~$OPENSSL_NR_CIPHERS ciphers]"
      out "${spaces}on $HNAME:"
      outln "$OPENSSL_LOCATION"
@@ -22338,7 +22358,7 @@ check_msg() {
 }
 
 
-# arg1 (optional): ftp smtp, lmtp, pop3, imap, sieve, xmpp, xmpp-server, telnet, ldap, postgres, mysql, irc, nntp (maybe with trailing s)
+# arg1 (optional): ftp smtp, lmtp, pop3, imap, sieve, xmpp, xmpp-server, telnet, ldap, postgres, mysql, irc, nntp, sieve (maybe with trailing s)
 #
 determine_service() {
      local ua
@@ -22387,7 +22407,7 @@ determine_service() {
           fi
 
           case "$protocol" in
-               ftp|smtp|lmtp|pop3|imap|sieve|xmpp|xmpp-server|telnet|ldap|postgres|mysql|nntp)
+               ftp|smtp|lmtp|pop3|imap|xmpp|xmpp-server|telnet|ldap|nntp|sieve|postgres|mysql)
                     STARTTLS="-starttls $protocol"
                     if [[ "$protocol" == xmpp ]] || [[ "$protocol" == xmpp-server ]]; then
                          if [[ -n "$XMPP_HOST" ]]; then
@@ -22457,7 +22477,7 @@ determine_service() {
                     outln
                     ;;
                *)   outln
-                    fatal "momentarily only ftp, smtp, lmtp, pop3, imap, sieve, xmpp, xmpp-server, telnet, ldap, nntp, postgres and mysql allowed" $ERR_CMDLINE
+                    fatal "momentarily only ftp, smtp, lmtp, pop3, imap, xmpp, xmpp-server, telnet, ldap, nntp, sieve, postgres and mysql allowed" $ERR_CMDLINE
                     ;;
           esac
           # It comes handy later also for STARTTLS injection to define this global. When we do banner grabbing
@@ -22573,7 +22593,7 @@ datebanner() {
           scan_time_f="$(printf "%04ss" "$SCAN_TIME")"           # 4 digits because of windows
           pr_reverse "$1 $(date +%F) $(date +%T) [$scan_time_f] -->> $node_banner <<--"
      else
-          pr_reverse "$1 $(date +%F) $(date +%T)                -->> $node_banner <<--"
+          pr_reverse "$1 $(date +%F) $(date +%T)        -->> $node_banner <<--"
      fi
      outln "\n"
      [[ "$1" =~ Start ]] && display_rdns_etc
