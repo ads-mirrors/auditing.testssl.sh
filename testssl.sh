@@ -20480,17 +20480,11 @@ find_openssl_binary() {
      case "$OSSL_VER_MAJOR.$OSSL_VER_MINOR" in
           1.0.2|1.1.0|1.1.1|3.*) HAS_DH_BITS=true ;;
      esac
-     if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
-          [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
-          if "$SSL_NATIVE"; then
-               outln
-               pr_warning "LibreSSL in native ssl mode is not a good choice for testing INSECURE features!"
-          fi
-     fi
 
      initialize_engine
 
      openssl_location="$(type -p $OPENSSL)"
+     
      [[ -n "$GIT_REL" ]] && \
           cwd="$PWD" || \
           cwd="$RUN_DIR"
@@ -20559,19 +20553,20 @@ find_openssl_binary() {
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error ||  HAS_PKUTIL=true
 
+     # In order to avoid delays due to lookups of the hostname "invalid." we just try to avoid using "-connect invalid."
+     # when possible. The following does a check fopr that. For WSL we stick for now to the old scheme. Not sure about Cygwin
      if [[ SYSTEM2 == "WSL" ]]; then
           NXCONNECT=-connect $NXDNS
      else
-          # Do we need -connect invalid. or the like? If this connects and bails out with an error message, we do not
+          # If this connects and bails out with an error message, we do not need "-connect invalid."
           if $OPENSSL s_client 2>&1 </dev/null | grep -Eiaq 'Connection refused|connect error|Bad file descriptor'; then
                NXCONNECT=""
           else
+               # We need to do link level DNS lookups. See issue #1418 and https://tools.ietf.org/html/rfc6761#section-6.4
                NXCONNECT="-connect $NXDNS"
           fi
      fi
 
-     # Below and at other occurrences we do a little trick using "$NXDNS" to avoid plain and
-     # link level DNS lookups. See issue #1418 and https://tools.ietf.org/html/rfc6761#section-6.4
      if "$HAS_TLS13"; then
           $OPENSSL s_client -tls1_3 -sigalgs PSS+SHA256:PSS+SHA384 $NXCONNECT </dev/null 2>&1 | grep -aiq "unknown option" || HAS_SIGALGS=true
      fi
@@ -20585,6 +20580,15 @@ find_openssl_binary() {
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
 
      OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
+
+     if [[ $OPENSSL_NR_CIPHERS -le 140 ]]; then
+          [[ ${OSSL_VER//./} -ge 210 ]] && HAS_DH_BITS=true
+          if "$SSL_NATIVE"; then
+               outln
+               pr_warning "LibreSSL/OpenSSL in native ssl mode with poor cipher support is not a good choice for testing INSECURE features!"
+          fi
+     fi
+
      if $OPENSSL s_client -curves </dev/null 2>&1 | grep -aiq "unknown option"; then
           if $OPENSSL s_client -groups </dev/null 2>&1 | grep -aiq "unknown option"; then
                # this is for openssl versions like 0.9.8, they do not have -groups or -curves -- just to be safe
@@ -21166,8 +21170,8 @@ EOF
 
      # remove clock and dow if the first word is a dow and not a dom (suse)
      short_built_date=${OSSL_BUILD_DATE/??:??:?? /}
-     if [[ ${short_built_date%% *} =~ [A-Za-z]{3} ]]; then
-        short_built_date=${short_built_date#* }
+     if [[ ${short_built_date%% *} =~ ^[A-Za-z]{3}$ ]]; then
+          short_built_date=${short_built_date#* }
      fi
      out "${spaces}Using "
      pr_italic "$OSSL_NAME $OSSL_VER ($short_built_date)"
