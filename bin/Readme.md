@@ -10,7 +10,7 @@ However testssl.sh has emerged, and some time back it is using bash sockets for 
 
 # Security notices
 
-The important thing upfront: **DO NOT USE THESE BINARIES FOR PRODUCTION PUPOSES**. A lot of security restrictions have been removed because we want to test how bad the servers are.
+The important thing upfront: **DO NOT USE THESE BINARIES FOR PRODUCTION PURPOSES**. A lot of security restrictions have been removed because we want to test how bad the servers are.
 
 
 More
@@ -19,7 +19,7 @@ More
 General
 -------
 The (stripped) binaries this directory are all compiled from the [old OpenSSL snapshot](https://github.com/testssl/openssl-1.0.2.bad) which adds a few bits to [Peter
-Mosman's openssl fork](https://github.com/PeterMosmans/openssl). The few bits are IPv6 support (except IPV6 proxy) and some STARTTLS backports. More, see the [README.md](https://github.com/testssl/openssl-1.0.2.bad/README.md) . 
+Mosman's openssl fork](https://github.com/PeterMosmans/openssl). The few bits are IPv6 support (except IPV6 proxy) and some STARTTLS backports. More, see the [README.md](https://github.com/testssl/openssl-1.0.2.bad/README.md).
 
 Compiled Linux and FreeBSD binaries so far came from Dirk, other contributors see ../CREDITS.md . Binaries for more architectures see [contributed builds @ https://testssl.sh/](https://testssl.sh/contributed_binaries/).
 
