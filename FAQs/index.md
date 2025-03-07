@@ -5,7 +5,7 @@ This is a collection of frequently asked questions which should help to answer s
 #### Coding
 
 * Why are you using bash, everybody nowadays uses (python|Golang|Java|etc), it's much faster and modern!
-   * The project started in 2007 as serious of OpenSSL commands in a shell script which was used for pen testing. OpenSSL then was the central part (and partly is) to do some basic operations for connections and certificates verification which would have been more tedious to implement in other programming languages. Over time the project became bigger and it in terms of resources it wasn't a viable option to convert it to (python|Golang|Java|etc). Besides, bash is easy to debug as opposed to a compiled binary. Personally, I believe its capabilities are often underestimated.
+   * The project started in 2007 as series of OpenSSL commands in a shell script which was used for pen testing. OpenSSL then was the central part (and partly is) to do some basic operations for connections and certificates verification which would have been more tedious to implement in other programming languages. Over time the project became bigger and it in terms of resources it wasn't a viable option to convert it to (python|Golang|Java|etc). Besides, bash is easy to debug as opposed to a compiled binary. Personally, I believe its capabilities are often underestimated.
 
 * But why don't you now amend it with a (python|perl|Golang|Java|etc) function which does \<ABC\> or \<DEF\> much faster?
    * The philosophy and the beauty of testssl.sh is that it runs *everywhere* with a minimal set of dependencies like typical Unix binaries. No worries about having a different version of libraries/ interpreter not installed.
