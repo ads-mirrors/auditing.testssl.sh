@@ -277,7 +277,7 @@ KNOWN_OSSL_PROB=false                   # We need OpenSSL a few times. This vari
 DETECTED_TLS_VERSION=""                 # .. as hex string, e.g. 0300 or 0303
 APP_TRAF_KEY_INFO=""                    # Information about the application traffic keys for a TLS 1.3 connection.
 TLS13_ONLY=false                        # Does the server support TLS 1.3 ONLY?
-TLS_EXTENSIONS=""
+declare -a TLS_EXTENSIONS=()
 TLS13_CERT_COMPRESS_METHODS=""
 CERTIFICATE_TRANSPARENCY_SOURCE=""
 V2_HELLO_CIPHERSPEC_LENGTH=0
@@ -7882,6 +7882,7 @@ sclient_connect_successful() {
 
 extract_new_tls_extensions() {
      local tls_extensions
+     local -i i
 
      # this is not beautiful (grep+sed)
      # but maybe we should just get the ids and do a private matching, according to
@@ -7895,12 +7896,15 @@ extract_new_tls_extensions() {
      if [[ -n "$tls_extensions" ]]; then
           # check to see if any new TLS extensions were returned and add any new ones to TLS_EXTENSIONS
           while read -d "\"" -r line; do
-               if [[ $line != "" ]] && [[ ! "$TLS_EXTENSIONS" =~ "$line" ]]; then
-#FIXME: This is a string of quoted strings, so this seems to determine the output format already. Better e.g. would be an array
-                    TLS_EXTENSIONS+=" \"${line}\""
+               if [[ $line != "" ]] && [[ ! "${TLS_EXTENSIONS[*]}" =~ "$line" ]]; then
+                    i=${#TLS_EXTENSIONS[*]}
+                    while [[ $i -gt 0 ]] && [[ ${TLS_EXTENSIONS[i-1]#*/#} -gt ${line#*/#} ]]; do
+                         TLS_EXTENSIONS[i]="${TLS_EXTENSIONS[i-1]}"
+                         i=$((i-1))
+                    done
+                    TLS_EXTENSIONS[i]="$line"
                fi
           done <<<$tls_extensions
-          [[ "${TLS_EXTENSIONS:0:1}" == " " ]] && TLS_EXTENSIONS="${TLS_EXTENSIONS:1}"
      fi
 }
 
@@ -7916,7 +7920,7 @@ extract_new_tls_extensions() {
 determine_tls_extensions() {
      local addcmd
      local -i success=1
-     local line params="" tls_extensions=""
+     local line params="" tls_extensions="" extn
      local alpn_proto alpn="" alpn_list_len_hex alpn_extn_len_hex
      local -i alpn_list_len alpn_extn_len
      local cbc_cipher_list="ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA256:DH-RSA-AES256-SHA256:DH-DSS-AES256-SHA256:DHE-RSA-AES256-SHA:DHE-DSS-AES256-SHA:DH-RSA-AES256-SHA:DH-DSS-AES256-SHA:ECDHE-RSA-CAMELLIA256-SHA384:ECDHE-ECDSA-CAMELLIA256-SHA384:DHE-RSA-CAMELLIA256-SHA256:DHE-DSS-CAMELLIA256-SHA256:DH-RSA-CAMELLIA256-SHA256:DH-DSS-CAMELLIA256-SHA256:DHE-RSA-CAMELLIA256-SHA:DHE-DSS-CAMELLIA256-SHA:DH-RSA-CAMELLIA256-SHA:DH-DSS-CAMELLIA256-SHA:ECDH-RSA-AES256-SHA384:ECDH-ECDSA-AES256-SHA384:ECDH-RSA-AES256-SHA:ECDH-ECDSA-AES256-SHA:ECDH-RSA-CAMELLIA256-SHA384:ECDH-ECDSA-CAMELLIA256-SHA384:AES256-SHA256:AES256-SHA:CAMELLIA256-SHA256:CAMELLIA256-SHA:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:DHE-RSA-AES128-SHA256:DHE-DSS-AES128-SHA256:DH-RSA-AES128-SHA256:DH-DSS-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA:DH-RSA-AES128-SHA:DH-DSS-AES128-SHA:ECDHE-RSA-CAMELLIA128-SHA256:ECDHE-ECDSA-CAMELLIA128-SHA256:DHE-RSA-CAMELLIA128-SHA256:DHE-DSS-CAMELLIA128-SHA256:DH-RSA-CAMELLIA128-SHA256:DH-DSS-CAMELLIA128-SHA256:DHE-RSA-SEED-SHA:DHE-DSS-SEED-SHA:DH-RSA-SEED-SHA:DH-DSS-SEED-SHA:DHE-RSA-CAMELLIA128-SHA:DHE-DSS-CAMELLIA128-SHA:DH-RSA-CAMELLIA128-SHA:DH-DSS-CAMELLIA128-SHA:ECDH-RSA-AES128-SHA256:ECDH-ECDSA-AES128-SHA256:ECDH-RSA-AES128-SHA:ECDH-ECDSA-AES128-SHA:ECDH-RSA-CAMELLIA128-SHA256:ECDH-ECDSA-CAMELLIA128-SHA256:AES128-SHA256:AES128-SHA:CAMELLIA128-SHA256:SEED-SHA:CAMELLIA128-SHA:IDEA-CBC-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DH-RSA-DES-CBC3-SHA:DH-DSS-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:ECDH-ECDSA-DES-CBC3-SHA:DES-CBC3-SHA:EXP1024-DHE-DSS-DES-CBC-SHA:EDH-RSA-DES-CBC-SHA:EDH-DSS-DES-CBC-SHA:DH-RSA-DES-CBC-SHA:DH-DSS-DES-CBC-SHA:EXP1024-DES-CBC-SHA:DES-CBC-SHA:EXP-EDH-RSA-DES-CBC-SHA:EXP-EDH-DSS-DES-CBC-SHA:EXP-DES-CBC-SHA:EXP-RC2-CBC-MD5:EXP-DH-DSS-DES-CBC-SHA:EXP-DH-RSA-DES-CBC-SHA"
@@ -7938,7 +7942,7 @@ determine_tls_extensions() {
                alpn_extn_len_hex=$(printf "%04x" $alpn_extn_len)
                tls_extensions+=", 00,10,${alpn_extn_len_hex:0:2},${alpn_extn_len_hex:2:2},${alpn_list_len_hex:0:2},${alpn_list_len_hex:2:2}$alpn"
           fi
-          if [[ ! "$TLS_EXTENSIONS" =~ encrypt-then-mac ]]; then
+          if [[ ! "${TLS_EXTENSIONS[*]}" =~ encrypt-then-mac ]]; then
                tls_sockets "03" "$cbc_cipher_list_hex, 00,ff" "all" "$tls_extensions"
                success=$?
           fi
@@ -7963,7 +7967,7 @@ determine_tls_extensions() {
           else
                addcmd="$SNI"
           fi
-          if [[ ! "$TLS_EXTENSIONS" =~ encrypt-then-mac ]]; then
+          if [[ ! "${TLS_EXTENSIONS[*]}" =~ encrypt-then-mac ]]; then
                $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $addcmd $OPTIMAL_PROTO -tlsextdebug $params -cipher $cbc_cipher_list") </dev/null 2>$ERRFILE >$TMPFILE
                sclient_connect_successful $? $TMPFILE
                success=$?
@@ -7978,7 +7982,13 @@ determine_tls_extensions() {
      fi
 
      # Keep it "on file" for debugging purposes
-     [[ "$DEBUG" -ge 1 ]] && safe_echo "$TLS_EXTENSIONS" >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
+     if [[ "$DEBUG" -ge 1 ]]; then
+          tls_extensions=""
+          for extn in "${TLS_EXTENSIONS[@]}"; do
+               tls_extensions+=" \"${extn}\""
+          done
+          safe_echo "${tls_extensions:1}" >"$TEMPDIR/$NODE.$NODEIP.tls_extensions.txt"
+     fi
 
      return $success
 }
@@ -8863,7 +8873,7 @@ certificate_transparency() {
      # determine_tls_extensions() discovered an SCT TLS extension. If the server has more than
      # one certificate, then it is possible that an SCT TLS extension is returned for some
      # certificates, but not for all of them.
-     if [[ $number_of_certificates -eq 1 ]] && [[ "$TLS_EXTENSIONS" =~ signed\ certificate\ timestamps ]]; then
+     if [[ $number_of_certificates -eq 1 ]] && [[ "${TLS_EXTENSIONS[*]}" =~ signed\ certificate\ timestamps ]]; then
           CERTIFICATE_TRANSPARENCY_SOURCE="TLS extension"
           return 0
      fi
@@ -10074,7 +10084,7 @@ run_server_defaults() {
      local -a ocsp_response_binary ocsp_response ocsp_response_status sni_used tls_version ct
      local -a ciphers_to_test certificate_type
      local -a -i success
-     local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions client_auth_ca
+     local cn_nosni cn_sni sans_nosni sans_sni san tls_extensions extn client_auth_ca
      local using_sockets=true
 
      "$SSL_NATIVE" && using_sockets=false
@@ -10326,7 +10336,7 @@ run_server_defaults() {
      outln
 
      pr_bold " TLS extensions (standard)    "
-     if [[ -z "$TLS_EXTENSIONS" ]]; then
+     if [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]]; then
           outln "(none)"
           fileout "TLS_extensions" "INFO" "(none)"
      else
@@ -10337,12 +10347,17 @@ run_server_defaults() {
           # across lines, temporarily replace space characters within the text
           # of an extension with "}", and then convert the "}" back to space in
           # the output of out_row_aligned_max_width().
-          tls_extensions="${TLS_EXTENSIONS// /{}"
+          tls_extensions=""
+          for extn in "${TLS_EXTENSIONS[@]}"; do
+               tls_extensions+=" \"${extn}\""
+          done
+          tls_extensions="${tls_extensions:1}"
+          fileout "TLS_extensions" "INFO" "$tls_extensions"
+          tls_extensions="${tls_extensions// /{}"
           tls_extensions="${tls_extensions//\"{\"/\" \"}"
           tls_extensions="$(out_row_aligned_max_width "$tls_extensions" "                              " $TERM_WIDTH)"
           tls_extensions="${tls_extensions//{/ }"
           outln "$tls_extensions"
-          fileout "TLS_extensions" "INFO" "$TLS_EXTENSIONS"
      fi
 
      pr_bold " Session Ticket RFC 5077 hint "
@@ -16710,8 +16725,8 @@ run_heartbleed(){
           return 1
      fi
 
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
-     if [[ ! "${TLS_EXTENSIONS}" =~ heartbeat ]]; then
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
+     if [[ ! "${TLS_EXTENSIONS[*]}" =~ heartbeat ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no heartbeat extension"
           fileout "$jsonID" "OK" "not vulnerable, no heartbeat extension" "$cve" "$cwe"
@@ -17015,8 +17030,8 @@ run_ticketbleed() {
      fi
 
      # highly unlikely that it is NOT supported. We may loose time here but it's more solid
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
-     if [[ ! "${TLS_EXTENSIONS}" =~ "session ticket" ]]; then
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
+     if [[ ! "${TLS_EXTENSIONS[*]}" =~ "session ticket" ]]; then
           pr_svrty_best "not vulnerable (OK)"
           outln ", no session ticket extension"
           fileout "$jsonID" "OK" "no session ticket extension" "$cve" "$cwe"
@@ -19118,7 +19133,7 @@ run_winshock() {
      # (~ sub_check_curves) which is some work. But also for the sake of clean code this needs to be done.
 
 
-     [[ -z "$TLS_EXTENSIONS" ]] && determine_tls_extensions
+     [[ ${#TLS_EXTENSIONS[*]} -eq 0 ]] && determine_tls_extensions
      # Basis of the following https://en.wikipedia.org/wiki/Comparison_of_TLS_implementations#Extensions
      # Our standard: https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml
 
@@ -19132,9 +19147,9 @@ run_winshock() {
      local -a forbidden_tls_ext=("encrypt-then-mac" "max fragment length")
      # Open whether ec_point_formats, supported_groups(=elliptic_curves), heartbeat are supported under windows <=2012
      # key_share and supported_versions are extensions which came with TLS 1.3. We checked the protocol before.
-     if [[ -n "$TLS_EXTENSIONS" ]]; then
+     if [[ ${#TLS_EXTENSIONS[*]} -gt 0 ]]; then
           # Check whether there are any TLS extension which should not be available under <= Windows 2012 R2
-          for tls_ext in $TLS_EXTENSIONS; do
+          for tls_ext in "${TLS_EXTENSIONS[@]}"; do
                # We use the whole array, got to be careful when the array becomes bigger (unintended match)
                if [[ ${forbidden_tls_ext[@]} =~ $tls_ext ]]; then
                     pr_svrty_best "not vulnerable (OK)"; outln " - TLS extension $tls_ext detected"
@@ -24376,7 +24391,7 @@ reset_hostdepended_vars() {
      NR_OSSL_FAIL=0
      NR_STARTTLS_FAIL=0
      NR_HEADER_FAIL=0
-     TLS_EXTENSIONS=""
+     TLS_EXTENSIONS=()
      TLS13_CERT_COMPRESS_METHODS=""
      CERTIFICATE_TRANSPARENCY_SOURCE=""
      PROTOS_OFFERED=""
