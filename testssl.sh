@@ -1833,6 +1833,8 @@ check_revocation_ocsp() {
      local -i success
      local response=""
      local host_header=""
+     local openssl_bin="$OPENSSL"
+     local addtl_warning=""
 
      "$PHONE_OUT" || [[ -n "$stapled_response" ]] || return 0
      [[ -n "$GOOD_CA_BUNDLE" ]] || return 0
@@ -1851,6 +1853,16 @@ check_revocation_ocsp() {
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
                -CAfile <(cat $ADDITIONAL_CA_FILES "$GOOD_CA_BUNDLE") -cert $HOSTCERT -text &> "$tmpfile"
      else
+          if [[ $OPENSSL =~ openssl.Linux.$(uname -m) ]]; then
+               # --phone-out doesn't lawyas work with "our" binary. We use just for that purpose
+               # the vendor supplied binary if available, see #2516 and probably also #2667 and #1275
+               if [[ -x "$OPENSSL2" ]]; then
+                    openssl_bin="$OPENSSL2"
+                    [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
+               fi
+          else
+               addtl_warning="(a segfault indicates here you need to test this with another binary)"
+          fi
           host_header=${uri##http://}
           host_header=${host_header%%/*}
           if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
@@ -1861,7 +1873,7 @@ check_revocation_ocsp() {
           else
                host_header="-header Host ${host_header}"
           fi
-          $OPENSSL ocsp -no_nonce ${host_header} -url "$uri" \
+          $openssl_bin ocsp -no_nonce ${host_header} -url "$uri" \
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
                -CAfile <(cat $ADDITIONAL_CA_FILES "$GOOD_CA_BUNDLE") -cert $HOSTCERT -text &> "$tmpfile"
      fi
@@ -1879,8 +1891,8 @@ check_revocation_ocsp() {
                fileout "$jsonID" "CRITICAL" "revoked"
           else
                out ", "
-               pr_warning "error querying OCSP responder"
-               fileout "$jsonID" "WARN" "$response"
+               pr_warning "error querying OCSP responder $addtl_warning"
+               fileout "$jsonID" "WARN" "$response $addtl_warning"
                if [[ $DEBUG -ge 2 ]]; then
                     outln
                     cat "$tmpfile"
