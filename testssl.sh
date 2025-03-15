@@ -1835,6 +1835,7 @@ check_revocation_ocsp() {
      local host_header=""
      local openssl_bin="$OPENSSL"
      local addtl_warning=""
+     local smartswitch=false
 
      "$PHONE_OUT" || [[ -n "$stapled_response" ]] || return 0
      [[ -n "$GOOD_CA_BUNDLE" ]] || return 0
@@ -1858,6 +1859,7 @@ check_revocation_ocsp() {
                # the vendor supplied binary if available, see #2516 and probably also #2667 and #1275
                if [[ -x "$OPENSSL2" ]]; then
                     openssl_bin="$OPENSSL2"
+                    smartswitch=true
                     [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
                fi
           else
@@ -1865,14 +1867,21 @@ check_revocation_ocsp() {
           fi
           host_header=${uri##http://}
           host_header=${host_header%%/*}
-          if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
-               host_header="-header Host ${host_header}"
-          elif [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.0* ]] || [[ $OSSL_VER_MAJOR.$OSSL_VER_MINOR == 1.1.1* ]] || \
-               [[ $OSSL_VER_MAJOR == 3 ]]; then
-               host_header="-header Host=${host_header}"
+
+          # The following is the default (like "-header Host r11.o.lencr.org")
+          host_header="-header Host ${host_header}"
+
+          if "$smartswitch" ; then
+               case $(openssl version -v | awk -F' ' '{ print $2 }') in
+                    # for those versions it's "-header Host=r11.o.lencr.org"
+                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
+               esac
           else
-               host_header="-header Host ${host_header}"
+               case $OSSL_VER_MAJOR.$OSSL_VER_MINOR in
+                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
+               esac
           fi
+
           $openssl_bin ocsp -no_nonce ${host_header} -url "$uri" \
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
                -CAfile <(cat $ADDITIONAL_CA_FILES "$GOOD_CA_BUNDLE") -cert $HOSTCERT -text &> "$tmpfile"
