@@ -188,6 +188,7 @@ TERM_CURRPOS=0                                              # custom line wrappi
 #
 # Following variables make use of $ENV and can be used like "OPENSSL=<myprivate_path_to_openssl> ./testssl.sh <URI>"
 declare -x OPENSSL
+OPENSSL2=${OPENSSL2:-/usr/bin/openssl}  # This will be openssl version >=1.1.1 (auto determined) as opposed to openssl-bad (OPENSSL)
 OPENSSL_TIMEOUT=${OPENSSL_TIMEOUT:-""}  # Default connect timeout with openssl before we call the server side unreachable
 CONNECT_TIMEOUT=${CONNECT_TIMEOUT:-""}  # Default connect timeout with sockets before we call the server side unreachable
 PHONE_OUT=${PHONE_OUT:-false}           # Whether testssl can retrieve CRLs and OCSP
@@ -1835,7 +1836,7 @@ check_revocation_ocsp() {
      local host_header=""
      local openssl_bin="$OPENSSL"
      local addtl_warning=""
-     local smartswitch=false
+     local ossl_name="$OSSL_NAME" ossl_ver="$OSSL_VER"
 
      "$PHONE_OUT" || [[ -n "$stapled_response" ]] || return 0
      [[ -n "$GOOD_CA_BUNDLE" ]] || return 0
@@ -1859,8 +1860,10 @@ check_revocation_ocsp() {
                # the vendor supplied binary if available, see #2516 and probably also #2667 and #1275
                if [[ -x "$OPENSSL2" ]]; then
                     openssl_bin="$OPENSSL2"
-                    smartswitch=true
                     [[ $DEBUG -ge 3 ]] && echo "Switching to $openssl_bin "
+                    ossl_ver="$($openssl_bin version -v 2>/dev/null)"
+                    ossl_name="${ossl_ver%% *}"
+                    ossl_ver="${ossl_ver#$ossl_name }"
                fi
           else
                addtl_warning="(a segfault indicates here you need to test this with another binary)"
@@ -1871,16 +1874,9 @@ check_revocation_ocsp() {
           # The following is the default (like "-header Host r11.o.lencr.org")
           host_header="-header Host ${host_header}"
 
-          if "$smartswitch" ; then
-               case $(openssl version -v | awk -F' ' '{ print $2 }') in
-                    # for those versions it's "-header Host=r11.o.lencr.org"
-                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
-               esac
-          else
-               case $OSSL_VER_MAJOR.$OSSL_VER_MINOR in
-                    3.*|1.1*) host_header=${host_header/Host /Host=} ;;
-               esac
-          fi
+          case "$ossl_ver" in
+               3.*|1.1*) [[ ! "$ossl_name" =~ LibreSSL ]] && host_header=${host_header/Host /Host=} ;;
+          esac
 
           $openssl_bin ocsp -no_nonce ${host_header} -url "$uri" \
                -issuer $TEMPDIR/hostcert_issuer.pem -verify_other $TEMPDIR/intermediatecerts.pem \
