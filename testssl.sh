@@ -10035,7 +10035,7 @@ certificate_info() {
           fileout "intermediate_cert <#${i}>${json_postfix}" "INFO" "$(pem_to_one_line "$cert")"
           fileout "intermediate_cert_fingerprintSHA256 <#${i}>${json_postfix}" "INFO" "$(determine_cert_fingerprint_serial "$cert" "-fingerprint -sha256")"
 
-          intermediate_certs_txt[i]="$($OPENSSL x509 -text -nameopt utf8 -noout 2>/dev/null <<< "$cert")"
+          intermediate_certs_txt[i]="$($OPENSSL x509 -text -nameopt multiline,-align,sname,-esc_msb,utf8,-space_eq -noout 2>/dev/null <<< "$cert")"
 
           # We don't need every value here. For the sake of being consistent here we add the rest
           IFS=',' read -r startdate enddate diffseconds days2expire yearstart < <(determine_dates_certificate "${intermediate_certs_txt[i]}")
@@ -10066,8 +10066,9 @@ certificate_info() {
                expok="OK"
           fi
           out " ($enddate). "
-          cn="$(awk -F= '/Subject:.*CN/ { print $NF }' <<< "${intermediate_certs_txt[i]}")"
-          issuer_CN="$(awk -F= '/Issuer:.*CN/ { print $NF }' <<< "${intermediate_certs_txt[i]}")"
+          # Match on Subject/Issuer plus next 3 lines
+          cn="$(awk '/Subject:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          issuer_CN="$(awk '/Issuer:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
           pr_italic "$(strip_leading_space "$cn")"; out " <-- "; prln_italic "$(strip_leading_space "$issuer_CN")"
           fileout "intermediate_cert_notAfter <#${i}>${json_postfix}" "$expok" "$enddate"
           fileout "intermediate_cert_expiration <#${i}>${json_postfix}" "$expok" "$cn_finding"
