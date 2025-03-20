@@ -17955,10 +17955,12 @@ run_ssl_poodle() {
      pr_bold " POODLE, SSL"; out " ($cve)               "
 
      if "$TLS13_ONLY" || [[ $(has_server_protocol ssl3) -eq 1 ]]; then
-          # one condition should normally suffice but we don't know when run_poddle() was called
+          # one condition should normally suffice but we don't know when run_poodle() was called
           pr_svrty_best "not vulnerable (OK)"
           outln ", no SSLv3 support"
           fileout "$jsonID" "OK" "not vulnerable, no SSLv3" "$cve" "$cwe"
+          # otherwise we'll get a non-zero return code and a message 'Rerun including POODLE SSL check' @ TLS_FALLBACK_SCSV, see #2708
+          POODLE=1
           return 0
      fi
 
