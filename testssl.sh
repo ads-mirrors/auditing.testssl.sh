@@ -2196,7 +2196,7 @@ connectivity_problem() {
 }
 
 sanitze_http_header() {
-     # sed implemntations tested were sometime not fine with header containing x0d x0a (CRLF) which is the usual
+     # sed implementations tested were sometime not fine with header containing x0d x0a (CRLF) which is the usual
      # case.  Also we use tr here to remove any crtl chars which the server side offers --> possible security problem
      # Only allowed now is LF + CR. See #2337.  awk OTOH, see above, doesn't seem to care -- but not under MacOS
      sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $HEADERFILE | tr -d '\000-\011\013\014\016-\037' >$HEADERFILE.tmp
