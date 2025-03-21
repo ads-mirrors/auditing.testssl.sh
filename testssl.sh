@@ -343,6 +343,7 @@ HAS_SSL3=false
 HAS_TLS13=false
 HAS_X448=false
 HAS_X25519=false
+HAS_SIGALGS=false
 HAS_PKUTIL=false
 HAS_PKEY=false
 HAS_NO_SSL2=false
@@ -7512,7 +7513,7 @@ get_server_certificate() {
      CERTIFICATE_LIST_ORDERING_PROBLEM=false
      if [[ "$1" =~ "tls1_3" ]]; then
           [[ $(has_server_protocol "tls1_3") -eq 1 ]] && return 1
-          if "$HAS_TLS13"; then
+          if "$HAS_TLS13" && "$HAS_SIGALGS"; then
                if [[ "$1" =~ "tls1_3_RSA" ]]; then
                     $OPENSSL s_client $(s_client_options "$STARTTLS $BUGS -showcerts -connect $NODEIP:$PORT $PROXY $SNI -tls1_3 -tlsextdebug -status -msg -sigalgs PSS+SHA256:PSS+SHA384") </dev/null 2>$ERRFILE >$TMPFILE
                elif [[ "$1" =~ "tls1_3_ECDSA" ]]; then
@@ -17248,6 +17249,7 @@ find_openssl_binary() {
      HAS_TLS13=false
      HAS_X448=false
      HAS_X25519=false
+     HAS_SIGALGS=false
      HAS_NO_SSL2=false
      HAS_NOSERVERNAME=false
      HAS_CIPHERSUITES=false
@@ -17288,6 +17290,10 @@ find_openssl_binary() {
 
      $OPENSSL pkey -help 2>&1 | grep -q Error || HAS_PKEY=true
      $OPENSSL pkeyutl 2>&1 | grep -q Error || HAS_PKUTIL=true
+
+     if "$HAS_TLS13"; then
+          $OPENSSL s_client -tls1_3 -sigalgs PSS+SHA256:PSS+SHA384 $NXCONNECT </dev/null 2>&1 | grep -aiq "unknown option" || HAS_SIGALGS=true
+     fi
 
      $OPENSSL s_client -noservername </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NOSERVERNAME=true
      $OPENSSL s_client -ciphersuites </dev/null 2>&1 | grep -aiq "unknown option" || HAS_CIPHERSUITES=true
@@ -17658,6 +17664,7 @@ HAS_SSL3: $HAS_SSL3
 HAS_TLS13: $HAS_TLS13
 HAS_X448: $HAS_X448
 HAS_X25519: $HAS_X25519
+HAS_SIGALGS: $HAS_SIGALGS
 HAS_NO_SSL2: $HAS_NO_SSL2
 HAS_SPDY: $HAS_SPDY
 HAS_ALPN: $HAS_ALPN
