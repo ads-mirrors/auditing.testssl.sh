@@ -21966,12 +21966,16 @@ check_proxy() {
           PROXYNODE="${PROXY%:*}"
           is_number "$PROXYPORT" || fatal "Proxy port cannot be determined from \"$PROXY\"" $ERR_CMDLINE
 
-          #FIXME: finish this with IPv6 proxy support, see #1105.
+          #FIXME: finish IPv6 proxy support, see #1105.
           if is_ipv4addr "$PROXYNODE"; then
                PROXYIP="$PROXYNODE"
           elif is_ipv6addr "$PROXYNODE"; then
                # Maybe an option like --proxy6 is better for purists
-               PROXYIP="[$PROXYNODE]"
+               if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
+                    PROXYIP="$PROXYNODE"
+               else
+                    PROXYIP="[$PROXYNODE]"
+               fi
           else
                # We check now preferred whether there was an IPv4 proxy via DNS specified
                # If it fails it could be an IPv6 only proxy via DNS or we just can't reach the proxy
