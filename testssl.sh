@@ -21962,17 +21962,23 @@ check_proxy() {
           # strip off http/https part if supplied:
           PROXY="${PROXY/http\:\/\//}"
           PROXY="${PROXY/https\:\/\//}"      # this shouldn't be needed
+          PROXYPORT="${PROXY##*:}"
           PROXYNODE="${PROXY%:*}"
-          PROXYPORT="${PROXY#*:}"
           is_number "$PROXYPORT" || fatal "Proxy port cannot be determined from \"$PROXY\"" $ERR_CMDLINE
 
-          #if is_ipv4addr "$PROXYNODE" || is_ipv6addr "$PROXYNODE" ; then
-          # IPv6 via openssl -proxy: that doesn't work. Sockets does
-#FIXME: finish this with LibreSSL which supports an IPv6 proxy
+          #FIXME: finish this with IPv6 proxy support, see #1105.
           if is_ipv4addr "$PROXYNODE"; then
                PROXYIP="$PROXYNODE"
+          elif is_ipv6addr "$PROXYNODE"; then
+               # Maybe an option like --proxy6 is better for purists
+               PROXYIP="[$PROXYNODE]"
           else
+               # We check now preferred whether there was an IPv4 proxy via DNS specified
+               # If it fails it could be an IPv6 only proxy via DNS or we just can't reach the proxy
                PROXYIP="$(get_a_record "$PROXYNODE" 2>/dev/null | grep -v alias | sed 's/^.*address //')"
+               if [[ -z "$PROXYIP" ]]; then
+                    PROXYIP="$(get_aaaa_record "$PROXYNODE" 2>/dev/null | grep -v alias | sed 's/^.*address //')"
+               fi
                [[ -z "$PROXYIP" ]] && fatal "Proxy IP cannot be determined from \"$PROXYNODE\"" $ERR_CMDLINE
           fi
           PROXY="-proxy $PROXYIP:$PROXYPORT"
