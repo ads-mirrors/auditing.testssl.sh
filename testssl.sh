@@ -21959,11 +21959,14 @@ check_proxy() {
                [[ -z "$PROXY" ]] && PROXY="${http_proxy#*\/\/}"
                [[ -z "$PROXY" ]] && fatal "you specified \"--proxy=auto\" but \"\$http(s)_proxy\" is empty" $ERR_CMDLINE
           fi
-          # strip off http/https part if supplied:
+          # strip http/https part if supplied:
           PROXY="${PROXY/http\:\/\//}"
           PROXY="${PROXY/https\:\/\//}"      # this shouldn't be needed
           PROXYPORT="${PROXY##*:}"
           PROXYNODE="${PROXY%:*}"
+          # strip square brackets in IPv6 notation, but we may enter them later
+          PROXYNODE="${PROXYNODE/\[/}"
+          PROXYNODE="${PROXYNODE/\]/}"
           is_number "$PROXYPORT" || fatal "Proxy port cannot be determined from \"$PROXY\"" $ERR_CMDLINE
 
           #FIXME: finish IPv6 proxy support, see #1105.
