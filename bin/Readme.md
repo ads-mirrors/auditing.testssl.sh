@@ -27,5 +27,5 @@ Compiled Linux and FreeBSD binaries so far came from Dirk, other contributors se
 Compilation instructions
 ------------------------
 
-See [https://github.com/testssl/openssl-1.0.2.bad/README.md](https://github.com/testssl/openssl-1.0.2.bad/README.md)
+See [https://github.com/testssl/openssl-1.0.2.bad/00-testssl-stuff/Readme.md](https://github.com/testssl/openssl-1.0.2.bad/00-testssl-stuff/Readme.md)
 
