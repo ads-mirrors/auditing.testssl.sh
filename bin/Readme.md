@@ -16,9 +16,9 @@ The important thing upfront: **DO NOT USE THESE BINARIES FOR PRODUCTION PURPOSES
 More
 ====
 
-In general these binaries are not needed anymore as weak crypto is covered by bash sockets if the binary from the vendor can't handle weak crypto. In the future release they will ne retired.
+In general these binaries are not needed anymore as weak crypto is covered by bash sockets if the binary from the vendor can't handle weak crypto. In a future release they will be retired.
 
-Testing with openssl however is at the moment faster opposed to using bash sockets. And binaries can handle protocols (/better) once the SSL/TLS connection is established, like retrieving the HTTP header.
+Testing with openssl however is at the moment faster as opposed to using bash sockets. And binaries can handle protocols (/better) once the SSL/TLS connection is established, like retrieving the HTTP header. Distributors / vendors however support as of 2024/2025 still protocols like TLS 1.0 and TLS 1.1, most of them even SSLv3, with some tweaks. So using older binaries like the ones in this directory is very often not needed.
 
 General
 -------
