@@ -5,7 +5,7 @@ Binaries
 The precompiled binaries provided in this directory have extended support for weak crypto which is normally not in OpenSSL
 or LibreSSL: 40+56 Bit, export/ANON ciphers, weak DH ciphers, weak EC curves, SSLv2 etc. -- all the dirty features needed for
 testing if you just ant to test with binaries. They also come with extended support for some  advanced cipher suites and/or
-features which are not in the offcial branch like (old version of the) CHACHA20+POLY1305 and CAMELLIA 256 bit ciphers.
+features which are not in the official branch like (old version of the) CHACHA20+POLY1305 and CAMELLIA 256 bit ciphers.
 
 # Security notices
 
