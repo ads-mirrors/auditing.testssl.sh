@@ -28,7 +28,7 @@ See [https://github.com/testssl/openssl-1.0.2.bad/00-testssl-stuff/Readme.md](ht
 
 ## Conderations regarding binaries
 
-testssl.sh has emerged a longer while back, so in general these binaries are not needed anymore as weak crypto is covered by bash sockets if the binary from the vendor can't handle weak crypto. In a future release they might be be retired, as they do not provide a overall benefit and als static linking with glibc doesn't work as flawlesly these days anymore as it used to be,
+testssl.sh has emerged a longer while back, so in general these binaries are not needed anymore as weak crypto is covered by bash sockets if the binary from the vendor can't handle weak crypto. In a future release they might be be retired, as they do not provide a overall benefit. Also static linking with glibc doesn't work as flawlessly these days anymore as it used to be,
 
 ### Speed
 
