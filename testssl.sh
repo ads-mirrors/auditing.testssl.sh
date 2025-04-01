@@ -21977,7 +21977,12 @@ check_proxy() {
                if [[ "$OSSL_NAME" =~ LibreSSL ]]; then
                     PROXYIP="$PROXYNODE"
                else
-                    PROXYIP="[$PROXYNODE]"
+                    # This was tested with vanilla OpenSSL versions
+                    if [[ ${OSSL_VER_MAJOR$}${OSSL_VER_MINOR} -ge 11 ]]; then
+                         PROXYIP="[$PROXYNODE]"
+                    else
+                         fatal_cmd_line "OpenSSL version >= 1.1.0 required for IPv6 proxy support" $ERR_OSSLBIN
+                    fi
                fi
           else
                # We check now preferred whether there was an IPv4 proxy via DNS specified
@@ -21985,6 +21990,11 @@ check_proxy() {
                PROXYIP="$(get_a_record "$PROXYNODE" 2>/dev/null | grep -v alias | sed 's/^.*address //')"
                if [[ -z "$PROXYIP" ]]; then
                     PROXYIP="$(get_aaaa_record "$PROXYNODE" 2>/dev/null | grep -v alias | sed 's/^.*address //')"
+                    if [[ -n "$PROXYIP" ]]; then
+                         if [[ ${OSSL_VER_MAJOR$}${OSSL_VER_MINOR} -lt 11 ]]; then
+                              fatal_cmd_line "OpenSSL version >= 1.1.0 required for IPv6 proxy support" $ERR_OSSLBIN
+                         fi
+                    fi
                fi
                [[ -z "$PROXYIP" ]] && fatal "Proxy IP cannot be determined from \"$PROXYNODE\"" $ERR_CMDLINE
           fi
