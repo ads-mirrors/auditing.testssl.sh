@@ -32,7 +32,7 @@ docker run -t mytestssl --help
 docker run --rm -t mytestssl -p --header example.com
 ```
 
-### From dockerhub or ghcr
+### From dockerhub or GHCR
 
 You can pull the image from dockerhub or ghcr and e.g run:
 
@@ -40,7 +40,7 @@ You can pull the image from dockerhub or ghcr and e.g run:
 docker run --rm -t drwetter/testssl.sh:3.0 --protocols --server-preference example.com
 ```
 
-respectively.
+respectively
 
 ```
 docker run --rm -it ghcr.io/testssl/testssl.sh:3.0 --protocols --server-preference example.com
@@ -48,7 +48,7 @@ docker run --rm -it ghcr.io/testssl/testssl.sh:3.0 --protocols --server-preferen
 
 As of now other tags supported are: ``latest`` or ``3.2``.. They are the same, i.e. the stable version. ``3.0`` is the old stable version.
 
-``docker run --rm -t drwetter/testssl.sh:3.0 example.com``.
+``docker run --rm -t drwetter/testssl.sh:3.0 example.com`` or, for GHCR: ``docker run --rm -t ghcr.io/testssl/testssl.sh:3.0 example.com``.
 
 Keep in mind that any output file (--log, --html, --json etc.) will be created in the container. If you wish to have this created in a local directory on your host you can mount a volume into the container and change the output prefix where the container user has write access to, e.g.:
 
