@@ -32,15 +32,21 @@ docker run -t mytestssl --help
 docker run --rm -t mytestssl -p --header example.com
 ```
 
-### From dockerhub
+### From dockerhub or ghcr
 
-You can pull the image from dockerhub and e.g run:
+You can pull the image from dockerhub or ghcr and e.g run:
 
 ```
 docker run --rm -t drwetter/testssl.sh:3.0 --protocols --server-preference example.com
 ```
 
-Other tags supported are: ``3.1dev`` and ``latest``. They are the same, i.e. the rolling release. ``3.0`` is the latest stable version from git which might have a few improvements (see git log) over the released 3.0.X.
+respectively.
+
+```
+docker run --rm -it ghcr.io/testssl/testssl.sh:3.0 --protocols --server-preference example.com
+```
+
+As of now other tags supported are: ``latest`` or ``3.2``.. They are the same, i.e. the stable version. ``3.0`` is the old stable version.
 
 ``docker run --rm -t drwetter/testssl.sh:3.0 example.com``.
 
