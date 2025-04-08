@@ -151,7 +151,7 @@
      minEcdsaBits+=(-1)
      curves+=("secp521r1:secp384r1:prime256v1")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Android 6.0")
      short+=("android_60")
@@ -917,7 +917,7 @@
      minEcdsaBits+=(-1)
      curves+=("X25519:secp256r1:secp384r1")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Chrome 101 (Win 10)")
      short+=("chrome_101_win10")
@@ -1635,7 +1635,7 @@
      minEcdsaBits+=(-1)
      curves+=("")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("IE 7 Vista")
      short+=("ie_7_vista")
@@ -1719,7 +1719,7 @@
      minEcdsaBits+=(-1)
      curves+=("")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("IE 9 Win 7")
      short+=("ie_9_win7")
@@ -2503,7 +2503,7 @@ names+=("Opera 66 (Win 10)")
      maxRsaBits+=(-1)
      minEcdsaBits+=(-1)
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Safari 15.4 (macOS 12.3.1)")
      short+=("safari_154_osx_1231")
@@ -2972,7 +2972,7 @@ names+=("Opera 66 (Win 10)")
      minEcdsaBits+=(-1)
      curves+=("X25519:secp256r1:secp521r1:secp384r1")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("OpenSSL 1.1.1b (Debian)")
      short+=("openssl_111b")
