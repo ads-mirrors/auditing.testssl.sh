@@ -1570,7 +1570,7 @@
      minEcdsaBits+=(-1)
      curves+=("X25519:secp256r1:secp384r1:secp521r1:ffdhe2048:ffdhe3072")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Firefox 71 (Win 10)")
      short+=("firefox_71_win10")
@@ -2459,7 +2459,7 @@ names+=("Opera 66 (Win 10)")
      maxRsaBits+=(-1)
      minEcdsaBits+=(-1)
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Safari 12.1 (macOS 10.13.6)")
      short+=("safari_121_osx_10136")
