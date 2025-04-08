@@ -151,7 +151,7 @@
      minEcdsaBits+=(-1)
      curves+=("secp521r1:secp384r1:prime256v1")
      requiresSha2+=(false)
-     current+=(false)
+     current+=(true)
 
      names+=("Android 6.0")
      short+=("android_60")
@@ -172,7 +172,7 @@
      minEcdsaBits+=(-1)
      curves+=("prime256v1:secp384r1")
      requiresSha2+=(false)
-     current+=(true)
+     current+=(false)
 
      names+=("Android 7.0 (native)")
      short+=("android_70")
