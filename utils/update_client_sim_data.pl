@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-### This is futile as the data havent changed for an eternity
+### This is futile as the data haven't changed for an eternity
 
 use strict;
 use Data::Dumper;
