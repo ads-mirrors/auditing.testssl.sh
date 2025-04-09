@@ -2061,6 +2061,8 @@
      minEcdsaBits+=(-1)
      curves+=("X25519MLKEM768:x25519:secp256r1:secp384r1")
      requiresSha2+=(true)
+     ja3+=("f8e65281e2992dcf1d057bc9aaf430e4")
+     ja4+=("t13d1516h2_8daaf6152771_02713d6af862")
      current+=(true)
 
      names+=("Opera 12.15 Win 7")
