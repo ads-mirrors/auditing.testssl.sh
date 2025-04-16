@@ -93,7 +93,7 @@
      requiresSha2+=(false)
      current+=(true)
 
-# Android 11+12 seems to be te same
+# Android 11+12 seems to be the same
 
      names+=("Android 11 (native)")
      short+=("android_11")
@@ -143,7 +143,7 @@
      ja4+=("t13d1713h1_5b57614c22b0_eca864cca44a")
      current+=(true)
 
-# Android 13+14 seems to be te same
+# Android 13+14 seems to be the same
 
      names+=("Android 13 (native)")
      short+=("android_13")
