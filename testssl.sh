@@ -21969,7 +21969,6 @@ check_proxy() {
           PROXYNODE="${PROXYNODE/\]/}"
           is_number "$PROXYPORT" || fatal "Proxy port cannot be determined from \"$PROXY\"" $ERR_CMDLINE
 
-          #FIXME: finish IPv6 proxy support, see #1105.
           if is_ipv4addr "$PROXYNODE"; then
                PROXYIP="$PROXYNODE"
           elif is_ipv6addr "$PROXYNODE"; then
