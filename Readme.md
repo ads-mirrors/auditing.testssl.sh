@@ -97,11 +97,11 @@ This is the stable release version 3.2. Please use it **now**, as 3.0.x will not
 
 ### Contributing
 
-A lot of contributors already helped to push the project where it currently is, see [CREDITS.md](https://github.com/testssl/testssl.sh/blob/3.2/CREDITS.md). Your contributions would be also welcome! Theres a [large to-do list](https://github.com/testssl/testssl.sh/issues). To get started look for issues which are labeled as [good first issue](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), [for grabs](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+grabs%22) or [help wanted](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). The latter is more advanced, you can also lookout for documentation issues.
+A lot of contributors already helped to push the project where it currently is, see [CREDITS.md](https://github.com/testssl/testssl.sh/blob/3.2/CREDITS.md). Your contributions would be also welcome! There's a [large to-do list](https://github.com/testssl/testssl.sh/issues). To get started look for issues which are labeled as [good first issue](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), [for grabs](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22for+grabs%22) or [help wanted](https://github.com/testssl/testssl.sh/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22). The latter is more advanced, you can also lookout for documentation issues.
 
 It is recommended to read [CONTRIBUTING.md](https://github.com/testssl/testssl.sh/blob/3.2/CONTRIBUTING.md) and please also have a look at he [Coding Convention](https://github.com/testssl/testssl.sh/blob/3.2/Coding_Convention.md). Before you start writing patches with hundreds of lines, better create an issue first.
 
-In general there's also some maintenance burden, like maintaining handshakes and CA stores, writing unit tests, improving github actions. If you believe you can contribute and be responsible to one of those maintenance task, please speak up. That would free ressources that we could use for development.
+In general there's also some maintenance burden, like maintaining handshakes and CA stores, writing unit tests, improving github actions. If you believe you can contribute and be responsible to one of those maintenance task, please speak up. That would free resources that we could use for development.
 
 
 ### Bug reports
