@@ -1,6 +1,5 @@
 FROM alpine:3.21 AS base-alpine
-RUN apk update \
-    && apk add --no-cache bash procps drill coreutils libidn curl socat openssl xxd \
+RUN apk add --no-cache bash procps drill coreutils libidn curl socat openssl xxd \
     && addgroup testssl \
     && adduser -G testssl -g "testssl user" -s /bin/bash -D testssl \
     && ln -s /home/testssl/testssl.sh /usr/local/bin/testssl.sh
