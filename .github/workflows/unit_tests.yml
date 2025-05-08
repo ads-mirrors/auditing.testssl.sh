@@ -23,13 +23,19 @@ jobs:
     name: Testing unit test on MacOS
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up perl etc
-      - run: brew install perl curl socat
-      - run: perl -V
-      - name: Install deps
-        run: sudo apt install dnsutils jsonlint
-      - run: cpanm --notest Test::More
-      - run: cpanm --notest Data::Dumper
-      - run: cpanm --notest JSON
-      - run: cpanm --notest Text::Diff
-      - run: prove -v
+        run: |
+          brew install perl curl socat jsonlint
+          perl -V
+
+      - name: install perl modules
+        run: |
+          cpanm --notest Test::More
+          cpanm --notest Data::Dumper
+          cpanm --notest JSON
+          cpanm --notest Text::Diff
+
+      -name: run it
+       run: |
+            prove -v
