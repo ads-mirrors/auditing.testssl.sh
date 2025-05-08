@@ -58,7 +58,7 @@ is(@errors,0,"no errors");
 $tests++;
 
 if ( $os eq "linux" ){
-     # macos doesn't have a timout command, unless we install coreutils (gnu coreutils)
+     # macos doesn't have a timeout command, unless we install coreutils (gnu coreutils)
      # so we just silently skip this
 
      #4
