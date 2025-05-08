@@ -1,4 +1,5 @@
-name: testssl.sh CI
+---
+name: testssl.sh CI with MacOS
 
 on:
   pull_request:
@@ -20,9 +21,11 @@ permissions:
 jobs:
   build:
     runs-on: macos-14
+
     name: Testing unit test on MacOS
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
       - name: Set up perl etc
         run: |
@@ -36,6 +39,6 @@ jobs:
           cpanm --notest JSON
           cpanm --notest Text::Diff
 
-      -name: run it
-       run: |
+      - name: run it
+        run: |
             prove -v
