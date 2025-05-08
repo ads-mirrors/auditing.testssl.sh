@@ -22,15 +22,18 @@ jobs:
   build:
     runs-on: macos-14
 
-    name: Testing unit test on MacOS
+    name: PoC unit test on MacOS
     steps:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: Set up perl etc
+      - name: Set up system (perl and curl is installed already)
         run: |
-          brew install perl curl socat jsonlint cpanminus
+          brew install socat jsonlint cpanminus
           perl -V
+          curl --version
+          openssl version -a
+          bash --version
 
       - name: install perl modules
         run: |
