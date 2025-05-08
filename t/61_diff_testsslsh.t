@@ -50,6 +50,10 @@ $baseline_csv =~ s/HTTP_headerTime.*\n//g;
 $cat_csv      =~ s/censys.io.*\n//g;
 $baseline_csv =~ s/censys.io.*\n//g;
 
+# this could contain the openssl path
+$cat_csv      =~ s/"engine_problem.*\n//g;
+$baseline_csv =~ s/"engine_problem.*\n//g;
+
 $diff = diff \$cat_csv, \$baseline_csv;
 
 # Compare the differences to the baseline file -- and print differences if there were detected.
