@@ -119,8 +119,8 @@ You can also debug yourself, see [here](https://github.com/testssl/testssl.sh/wi
 
 Please address questions not specifically to the code of testssl.sh to the respective projects below.
 
-#### AI powered docs @ DeepWiki
-* https://deepwiki.com/testssl/testssl.sh
+#### Docs
+* [![DeepWiki](https://devin.ai/assets/deepwiki-badge.png)](https://deepwiki.com/testssl/testssl.sh): AI powered docs 
 
 #### Web frontend
 * https://github.com/johannesschaefer/webnettools
@@ -150,5 +150,5 @@ Please address questions not specifically to the code of testssl.sh to the respe
 #### Daemon for batch processing of testssl.sh JSON result files for sending Slack alerts, reactive copying etc
 * https://github.com/bitsofinfo/testssl.sh-alerts
 
-#### GitHub Actions
+#### Scan via GitHub Actions
 * https://github.com/marketplace/actions/testssl-sh-scan
