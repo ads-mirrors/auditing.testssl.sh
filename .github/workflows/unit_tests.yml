@@ -31,15 +31,15 @@ jobs:
         run: |
           brew install socat jsonlint cpanminus
           mv /opt/homebrew/bin/openssl /opt/homebrew/bin/openssl.NOPE
-          printf "----------\n"
+          printf "%s\n" "----------"
           perl -V
-          printf "----------\n"
+          printf "%s\n" "----------"
           curl --version
-          printf "----------\n"
+          printf "%s\n" "----------"
           openssl version -a
-          printf "----------\n"
+          printf "%s\n" "----------"
           bash --version
-          printf "----------\n"
+          printf "%s\n" "----------"
 
       - name: install perl modules
         run: |
