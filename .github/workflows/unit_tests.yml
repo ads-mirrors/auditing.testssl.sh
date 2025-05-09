@@ -27,13 +27,19 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: Set up system (perl and curl is installed already)
+      - name: Set up system (perl, curl is installed already)
         run: |
           brew install socat jsonlint cpanminus
+          mv /opt/homebrew/bin/openssl /opt/homebrew/bin/openssl.NOPE
+          printf "----------\n"
           perl -V
+          printf "----------\n"
           curl --version
+          printf "----------\n"
           openssl version -a
+          printf "----------\n"
           bash --version
+          printf "----------\n"
 
       - name: install perl modules
         run: |
