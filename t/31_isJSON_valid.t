@@ -82,7 +82,7 @@ if ( $os eq "linux" ){
      is(@errors,0,"no errors");
      $tests++;
 
-} elif ( $os eq "darwin" ){
+} elsif ( $os eq "darwin" ){
      printf "skipped two checks on MacOS\n\n";
 }
 
