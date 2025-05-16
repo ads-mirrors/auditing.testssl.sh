@@ -1,11 +1,14 @@
 
 ## Intro
-
-[![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/testssl/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+![GitHub Tag](https://img.shields.io/github/v/tag/testssl/testssl.sh)
+![Static Badge](https://img.shields.io/badge/%2Fbin%2Fbash_-blue)
+![Static Badge](https://img.shields.io/badge/OpenSSL_-blue)
 [![License](https://img.shields.io/github/license/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/LICENSE)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/testssl/testssl.sh)
+[![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
 [![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
-
+![Mastodon Follow](https://img.shields.io/mastodon/follow/109319848143024146?domain=infosec.exchange)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/testssl/testssl.sh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 `testssl.sh` is a free command line tool which checks a server's service on
 any port for the support of TLS/SSL ciphers, protocols as well as some
