@@ -50,10 +50,10 @@ jobs:
 
       - name: Install perl modules
         run: |
-        cpanm --notest Test::More
-        cpanm --notest Data::Dumper
-        cpanm --notest JSON
-        cpanm --notest Text::Diff
+          cpanm --notest Test::More
+          cpanm --notest Data::Dumper
+          cpanm --notest JSON
+          cpanm --notest Text::Diff
 
       - name: run it
         run: |
