@@ -4,6 +4,8 @@
 ![Static Badge](https://img.shields.io/badge/%2Fbin%2Fbash_-blue)
 ![Static Badge](https://img.shields.io/badge/OpenSSL_-blue)
 [![License](https://img.shields.io/github/license/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/LICENSE)
+![GitHub Created At](https://img.shields.io/github/created-at/testssl/testssl.sh)
+![GitHub last commit](https://img.shields.io/github/last-commit/testssl/testssl.sh)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/testssl/testssl.sh)
 [![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
 [![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
