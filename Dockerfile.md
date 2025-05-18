@@ -1,6 +1,6 @@
 ## Usage
 
-Run the image with `testssl.sh` options appended (default is `--help`). The container entrypoint is already set to `testsl.sh` as the command for convenience.
+Run the image with `testssl.sh` options appended (default is `--help`). The container entrypoint is already set to `testsl.sh` for convenience.
 
 ```bash
 docker run --rm -it ghcr.io/testssl/testssl.sh:3.2 --fs github.com
@@ -47,7 +47,7 @@ There are two base images supported:
 - openSUSE Leap ([`Dockerfile`](./Dockerfile)), glibc-based + faster.
 - Alpine ([`Dockerfile`](./Dockerfile.alpine)), musl-based + half the size.
 
-The Alpine variant is made available if you need broarder platform support, or an image about 30MB smaller at the expense of slightly slower performance.
+The Alpine variant is made available if you need broader platform support, or an image about 30MB smaller at the expense of slightly slower performance.
 
 #### Tip - Remote build context + `Dockerfile`
 
