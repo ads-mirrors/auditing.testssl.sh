@@ -54,7 +54,7 @@ $baseline_csv =~ s/censys.io.*\n//g;
 #       testssl.sh, see #2763. But for now we do this here.
 $cat_csv      =~ s/AEAD-AES128-GCM-SHA256/TLS_AES_128_GCM_SHA256/g;
 $cat_csv      =~ s/AEAD-AES256-GCM-SHA384/TLS_AES_256_GCM_SHA384/g;
-$cat_csv      =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
+$cat_csv      =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256 /g;
 
 # Same with ECDH bit length
 $cat_csv      =~ s/ECDH 253/ECDH 256/g;
