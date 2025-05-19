@@ -16,7 +16,7 @@ RUN <<HEREDOC
   # Install packages to a custom root-fs location (defined in `ZYPPER_OPTIONS`):
   zypper "${ZYPPER_OPTIONS[@]}" --gpg-auto-import-keys refresh
   zypper "${ZYPPER_OPTIONS[@]}" --non-interactive install --download-in-advance --no-recommends \
-       bash procps grep gawk sed coreutils busybox ldns libidn2-0 socat openssl curl
+    bash procps grep gawk sed coreutils busybox ldns libidn2-0 socat openssl curl
 
   # Optional - Avoid `CACHE_ZYPPER` from being redundantly cached in this RUN layer:
   # (doesn't improve `INSTALL_ROOT` size thanks to `--cache-dir`)
