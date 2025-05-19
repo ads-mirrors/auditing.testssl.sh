@@ -17656,7 +17656,7 @@ run_renego() {
                # s_client STDIN too early as the close could come at any time and race with the tear down of s_client.
                # See https://github.com/drwetter/testssl.sh/issues/2590
                # In this case the added iteration is harmless as it will just spin in backgroup
-               for ((i=0; i <= ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; /usr/bin/echo R 2>/dev/null; k=0; \
+               for ((i=0; i <= ssl_reneg_attempts; i++ )); do sleep $ssl_reneg_wait; echo R 2>/dev/null; k=0; \
                    # 0 means client is renegotiating & doesn't return an error --> vuln!
                    # 1 means client tried to renegotiating but the server side errored then. You still see RENEGOTIATING in the output
                    # Exemption from above: server closed the connection but return value was zero
@@ -17665,7 +17665,7 @@ run_renego() {
                          && [[ $(tail -1 $ERRFILE | grep -acE '^(RENEGOTIATING|depth|verify|notAfter)') -eq 1 ]] \
                          && [[ $k -lt 120 ]]; \
                        do sleep $ssl_reneg_wait; ((k++)); if (tail -5 $TMPFILE| grep -qa '^closed'); then break; fi; done; \
-               done) | \
+               done) 2> /dev/null | \
                $OPENSSL_NOTIMEOUT s_client $(s_client_options "$proto $legacycmd $STARTTLS $BUGS -connect $NODEIP:$PORT $PROXY $SNI") >$TMPFILE 2>$ERRFILE &
           pid=$!
           ( sleep $((ssl_reneg_attempts*3+3)) && kill $pid && touch $TEMPDIR/was_killed ) >&2 2>/dev/null &
