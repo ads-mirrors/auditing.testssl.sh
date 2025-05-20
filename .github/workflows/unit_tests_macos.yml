@@ -1,5 +1,5 @@
 ---
-name: CI runner MacOS
+name: CI run MacOS
 
 on:
   pull_request:

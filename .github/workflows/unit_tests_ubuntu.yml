@@ -1,5 +1,5 @@
 ---
-name: CI runner Ubuntu
+name: CI run Ubuntu
 
 on:
   pull_request:
