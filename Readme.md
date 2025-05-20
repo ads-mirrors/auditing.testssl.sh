@@ -2,12 +2,13 @@
 ## Intro
 ![GitHub Tag](https://img.shields.io/github/v/tag/testssl/testssl.sh)
 ![Static Badge](https://img.shields.io/badge/%2Fbin%2Fbash_-blue)
-![Static Badge](https://img.shields.io/badge/OpenSSL_-blue)
+![Static Badge](https://img.shields.io/badge/Libre+OpenSSL_-blue)
 [![License](https://img.shields.io/github/license/testssl/testssl.sh)](https://github.com/testssl/testssl.sh/LICENSE)
 ![GitHub Created At](https://img.shields.io/github/created-at/testssl/testssl.sh)
 ![GitHub last commit](https://img.shields.io/github/last-commit/testssl/testssl.sh)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/testssl/testssl.sh)
-[![CI tests](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
+[![CI test Ubuntu](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_ubuntu.yml)
+[![CI test MacOS](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml/badge.svg)](https://github.com/testssl/testssl.sh/actions/workflows/unit_tests_macos.yml)
 [![Docker](https://img.shields.io/docker/pulls/drwetter/testssl.sh)](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md)
 ![Mastodon Follow](https://img.shields.io/mastodon/follow/109319848143024146?domain=infosec.exchange)
 [![Bluesky](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpublic.api.bsky.app%2Fxrpc%2Fapp.bsky.actor.getProfile%2F%3Factor%3Dtestssl.bsky.social&query=%24.followersCount&style=social&logo=bluesky&label=Follow%20%40testssl.sh)
@@ -30,6 +31,7 @@ cryptographic flaws.
 * Privacy: It's only you who sees the result, not a third party.
 * Freedom: It's 100% open source. You can look at the code, see what's going on.
 * The development is free and open @ GitHub and participation is welcome.
+* Unit tests ensure maturity (output is consistent, JSON is valid, runs under Linux+MacOS etc)
 
 ### License
 
@@ -52,7 +54,7 @@ but you can also use any LibreSSL or OpenSSL version.
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification here or @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
+Update notification can be found here or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
 
 ### Installation
 
