@@ -1,5 +1,5 @@
 ---
-name: testssl.sh CI with Ubuntu
+name: CI runner Ubuntu
 
 on:
   pull_request:

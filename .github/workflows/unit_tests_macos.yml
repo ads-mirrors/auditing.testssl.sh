@@ -1,5 +1,5 @@
 ---
-name: testssl.sh CI with MacOS
+name: CI runner MacOS
 
 on:
   pull_request:
@@ -42,7 +42,7 @@ jobs:
           bash --version
           printf "%s\n" "----------"
 
-      - name: install perl modules
+      - name: Install perl modules
         run: |
           cpanm --notest Test::More
           cpanm --notest Data::Dumper
@@ -51,4 +51,4 @@ jobs:
 
       - name: run it
         run: |
-            prove -v
+          prove -v t
