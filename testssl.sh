@@ -17180,7 +17180,7 @@ run_ccs_injection(){
 # 0A:      Unexpected message
 # 28:      Handshake failure
      if [[ -z "${tls_hello_ascii:0:12}" ]]; then
-          # empty reply, this preply is the normal case
+          # empty reply which is the normal case
           pr_svrty_best "not vulnerable (OK)"
           if [[ $retval -eq 3 ]]; then
                fileout "$jsonID" "OK" "not vulnerable (timed out)" "$cve" "$cwe"
