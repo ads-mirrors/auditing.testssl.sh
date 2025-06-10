@@ -10121,9 +10121,12 @@ certificate_info() {
                expok="OK"
           fi
           out " ($enddate). "
-          # Match on Subject/Issuer plus next 3 lines
-          cn="$(awk '/Subject:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
-          issuer_CN="$(awk '/Issuer:/{stop=NR+3}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          # Match on Subject/Issuer plus next 4 lines, there should be the CN
+          cn="$(awk '/Subject:/{stop=NR+4}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          issuer_CN="$(awk '/Issuer:/{stop=NR+4}; NR<=stop' <<< "${intermediate_certs_txt[i]}" | awk -F= '/CN/ { print $NF }')"
+          # to catch errors like #2789 during unit test:
+          [[ -z "$cn" ]] && cn="FIXME: cn Error"
+          [[ -z "$issuer_CN" ]] && issuer_CN="FIXME: issuer_CN Error"
           pr_italic "$(strip_leading_space "$cn")"; out " <-- "; prln_italic "$(strip_leading_space "$issuer_CN")"
           fileout "intermediate_cert_notAfter <#${i}>${json_postfix}" "$expok" "$enddate"
           fileout "intermediate_cert_expiration <#${i}>${json_postfix}" "$expok" "$cn_finding"
