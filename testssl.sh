@@ -2901,7 +2901,7 @@ run_server_banner() {
           run_http_header "$1" || return 1
      fi
      pr_bold " Server banner                "
-     grep -ai '^Server' $HEADERFILE >$TMPFILE
+     grep -wEai '^Server[^-]' $HEADERFILE >$TMPFILE
      if [[ $? -eq 0 ]]; then
           serverbanner=$(sed -e 's/^Server: //' -e 's/^server: //' $TMPFILE)
           serverbanner=${serverbanner//$'\r'}
