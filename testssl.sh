@@ -20973,7 +20973,7 @@ find_openssl_binary() {
           # We also check, whether there's $OPENSSL2 which has TLS 1.3
           if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
                OPENSSL_CONF='' $OPENSSL2 s_client -help 2>$s_client_has2
-               $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
+               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
                grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
                grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
                # Likely we don't need the following second check here, see 6 lines above
