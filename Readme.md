@@ -35,7 +35,7 @@ to get bugfixes, other feedback and more contributions.
 
 testssl.sh is working on every Linux/BSD distribution out of the box. Latest by 2.9dev
 most of the limitations of disabled features from the openssl client are gone
-due to bash-socket-based checks. As a result you can also use e.g. LibreSSL or OpenSSL
+due to bash-socket-based checks. As a result you can also use any LibreSSL or OpenSSL version
 1.1.1 or 3.x. testssl.sh also works on other unixoid systems out of the box, supposed they have
 `/bin/bash` >= version 3.2 and standard tools like sed and awk installed. An implicit
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
@@ -43,22 +43,18 @@ to have GNU grep installed. MacOS X and Windows (using MSYS2, Cygwin or WSL) wor
 
 ### Status
 
-**Please note that very soon you won't receive any updates for the 3.0.x releases anymore.** While
-this is true for quite some time as far as features are concerned, this will be also
-the case for maintenance updates like CA and handshakes but also as far as security
-fixes are concerned.
+**You are looking at the old stabe version 3.0.10. This is the last version and it will not receive
+any updates.** Please migrate ASAP to the stable 3.2 branch!
 
-Please use the 3.2 branch!
-
-Update notification here or @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). The [twitter](https://twitter.com/drwetter) account is not being used anymore.
+Update notification for newer versions can be found @ [github](https:/github.com/testssl/testssl.sh) or @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). The [twitter](https://twitter.com/drwetter) account is not being used anymore.
 
 ### Installation
 
-You can download testssl.sh by cloning this git repository:
+You can download this testssl.sh version by cloning this git repository:
 
     git clone --depth 1 https://github.com/testssl/testssl.sh.git --branch 3.0
 
-For the stable version help yourself by downloading the latest [ZIP](https://github.com/testssl/testssl.sh/releases) from the 3.0.X branch or the latest testssl-3.0.X.tar.gz from [https://testssl.sh](https://testssl.sh/) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there.
+For the stable version help yourself by downloading the latest [ZIP](https://github.com/testssl/testssl.sh/releases) from the 3.0.x branch or the latest testssl-3.0.x.tar.gz from [https://testssl.sh](https://testssl.sh/) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there.
 
 #### Docker
 
