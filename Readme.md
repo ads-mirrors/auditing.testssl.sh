@@ -54,7 +54,7 @@ but you can also use any LibreSSL or OpenSSL version.
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification can be found at [github](https://github.com/testssl/testssl.sh) or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
+Update notifications can be found at [github](https://github.com/testssl/testssl.sh) or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
 
 ### Installation
 
