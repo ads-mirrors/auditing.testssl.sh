@@ -54,7 +54,7 @@ but you can also use any LibreSSL or OpenSSL version.
 (silent) check for binaries is done when you start testssl.sh . System V needs probably
 to have GNU grep installed. Windows (using MSYS2, Cygwin or WSL) work too.
 
-Update notification can be found here or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
+Update notifications can be found at [github](https://github.com/testssl/testssl.sh) or most important ones @ [mastodon](https://infosec.exchange/@testssl) or [bluesky](https://bsky.app/profile/testssl.bsky.social). [twitter](https://twitter.com/drwetter) is not being used anymore.
 
 ### Installation
 
@@ -62,8 +62,7 @@ You can download testssl.sh branch 3.2 just by cloning this git repository:
 
     git clone --depth 1 https://github.com/testssl/testssl.sh.git
 
-3.2 is now the latest stable branch which evolved from 3.1dev. There will be one last bugfix release for the former stable version named old-stable, which will be 3.0.10.
-<!--  please help yourself by downloading the [ZIP](https://codeload.github.com/testssl/testssl.sh/zip/v3.0.9) or [tar.gz](https://codeload.github.com/testssl/testssl.sh/tar.gz/v3.0.9) archive. Just ``cd`` to the directory created (=INSTALLDIR) and run it off there. -->
+3.2 is the latest stable branch which evolved from 3.1dev. In June 2025 there was a last bugfix release for the former stable version named old-stable, which is 3.0.10. Please use 3.2 **now**, as 3.0.x will not get any updates.
 
 #### Docker
 
@@ -95,7 +94,7 @@ Testssl.sh is intended to be used as a standalone CLI tool. While we tried to ap
 
 ### Status
 
-This is the stable version 3.2. Please use it **now**, as 3.0.x will not get any updates after 3.0.10, with the current manpower we only support n-1 versions. There will be soon a separate 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable.
+Given the current manpower we only support n-1 versions. We started a 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable. As said, 3.0.x became EOL.
 
 ### Documentation
 
