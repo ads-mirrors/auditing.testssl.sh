@@ -58,21 +58,31 @@ Update notifications can be found at [github](https://github.com/testssl/testssl
 
 ### Installation
 
-You can download testssl.sh branch 3.2 just by cloning this git repository:
+You can download testssl.sh branch 3.3dev just by cloning this git repository:
 
-    git clone --depth 1 https://github.com/testssl/testssl.sh.git
+    git clone --depth 1 https://github.com/testssl/testssl.sh.git --branch 3.3dev
 
-3.2 is the latest stable branch which evolved from 3.1dev. In June 2025 there was a last bugfix release for the former stable version named old-stable, which is 3.0.10. Please use 3.2 **now**, as 3.0.x will not get any updates.
+3.3dev is the latest development branch which evolved from 3.2 stable. We're trying not to do big experiments in the dev branch, however the point of development ist that there will be changes and changes might need a bit time to mature.
+
+
 
 #### Docker
 
+
+
 Testssl.sh has minimal requirements. As stated you don't have to install or build anything. You can just run it from the pulled/cloned directory. Still if you don't want to pull the GitHub repo to your directory of choice you can pull a container from dockerhub and run it:
+
+<!--
+
+#FIXME: 3.3dev @ dockerhib to be created
 
 ```
 docker run --rm -ti  drwetter/testssl.sh <your_cmd_line>
 ```
 
 or from GHCR (GitHub Container Registry which supports more platforms: linux/amd64, linux/386, linux/arm64, linux/arm/v7, linux/arm/v6, linux/ppc64le):
+
+-->
 
 ```
 docker run --rm -it ghcr.io/testssl/testssl.sh <your_cmd_line>
@@ -84,7 +94,10 @@ Or if you have cloned this repo you also can just ``cd`` to the INSTALLDIR and r
 docker build . -t imagefoo && docker run --rm -t imagefoo testssl.net
 ```
 
-For more please consult [Dockerfile.md](https://github.com/testssl/testssl.sh/blob/3.2/Dockerfile.md).
+For more please consult [Dockerfile.md](https://github.com/testssl/testssl.sh/blob/3.3dev/Dockerfile.md).
+
+
+
 
 ### No Warranty
 
@@ -94,7 +107,8 @@ Testssl.sh is intended to be used as a standalone CLI tool. While we tried to ap
 
 ### Status
 
-Given the current manpower we only support n-1 versions. We started a 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable. As said, 3.0.x became EOL.
+Given the current manpower we only support n-1 versions. You're looking at the 3.3.dev branch where further development takes place before 3.4 becomes the stable version and 3.2 becomes old-stable. If you are hestitant with respect to changes, you need to use 3.2. The version 3.0.10 was the last one, there will not be any updates.
+
 
 ### Documentation
 
