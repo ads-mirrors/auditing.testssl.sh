@@ -5,11 +5,11 @@ on:
     branches:
       - 3.3dev
   workflow_dispatch:
-  # Every week at 8am on Mondays, publish the 3.3dev branch:
+  # Every day at 7am on Mondays, publish the 3.3dev branch.
   # NOTE: `schedule` event is only triggered for the default branch:
   # https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
   schedule:
-    - cron: "0 8 * * 1"
+    - cron: "0 7 * * *"
 
 env:
   GIT_BRANCH: "3.3dev"
