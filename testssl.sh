@@ -7838,12 +7838,11 @@ determine_trust() {
                               if ! [[ ${certificate_file[i]} =~ Java ]]; then
                                    # Exemption for Java AND rating, as this store doesn't seem to be as complete.
                                    # We won't penalize this but we still need to raise a red flag. See #1648
-                                   # set_grade_cap "T" "Issues with chain of trust $code"
-                                   if [[ "$code" =~ "chain incomplete" ]]; then 
+                                   if [[ "$code" =~ "chain incomplete" ]]; then
                                       set_grade_cap "B" "Issues with chain of trust $code"
                                    else
                                       set_grade_cap "T" "Issues with chain of trust $code"
-                                   fi 
+                                   fi
                               fi
                          fi
                     done
