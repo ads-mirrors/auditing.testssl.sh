@@ -6141,16 +6141,17 @@ run_protocols() {
 sub_quic() {
      local alpn=""
      local use_openssl=""
+     local proxy_hint_str=""
      local sclient_outfile="$TEMPDIR/$NODEIP.quic_connect.txt"
      local sclient_errfile="$TEMPDIR/$NODEIP.quic_connect_err.txt"
      local jsonID="QUIC"
 
-     pr_bold " QUIC       ";
-
      [[ $DEBUG -ne 0 ]] && sclient_errfile=/dev/null
 
+     pr_bold " QUIC       ";
+
      if "$HAS2_QUIC" || "$HAS_QUIC"; then
-          # Be aware: A proxy is not supported at all
+          # Proxying QUIC is not supported
           # The s_client call would block if either the remote side doesn't support QUIC or outbound traffic is blocked
           if "$HAS2_QUIC"; then
                use_openssl="$OPENSSL2"
@@ -6161,8 +6162,11 @@ sub_quic() {
                2>$sclient_errfile  >$sclient_outfile &
           wait_kill $! $QUIC_WAIT
           if [[ $? -ne 0 ]]; then
-               outln "not offered"
-               fileout "$jsonID" "INFO" "not offered"
+               if [[ -n "$PROXY" ]]; then
+                    proxy_hint_str="(tried directly, is not proxyable):"
+               fi
+               outln "$proxy_hint_str not offered or timed out"
+               fileout "$jsonID" "INFO" "$proxy_hint_str not offered"
           else
                pr_svrty_best "offered (OK)"
                fileout "$jsonID" "OK" "offered"
