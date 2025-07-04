@@ -3,7 +3,7 @@
 
 ### Features implemented / improvements in 3.3dev
 
-* QUIC
+* QUIC protocol check
 
 ### Features implemented / improvements in 3.2
 
