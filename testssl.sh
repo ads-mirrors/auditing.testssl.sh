@@ -2820,6 +2820,7 @@ run_hsts() {
           if ! is_number "$hsts_age_sec"; then
                pr_svrty_medium "misconfiguration: \'"$hsts_age_sec"\' is not a valid max-age specification"
                fileout "${jsonID}_time" "MEDIUM" "misconfiguration, specified not a number for max-age"
+               set_grade_warning "HSTS max-age is misconfigured"
           else
                if [[ -n $hsts_age_sec ]]; then
                     hsts_age_days=$(( hsts_age_sec / 86400))
@@ -2859,7 +2860,6 @@ run_hsts() {
      else
           pr_svrty_low "not offered"
           fileout "$jsonID" "LOW" "not offered"
-          set_grade_warning "HSTS is disabled"
      fi
      outln
 
