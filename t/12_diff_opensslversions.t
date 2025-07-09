@@ -88,8 +88,7 @@ $cat_csvfile  =~ s/AEAD-AES256-GCM-SHA384/TLS_AES_256_GCM_SHA384/g;
 $cat_csvfile  =~ s/x1303   AEAD-CHACHA20-POLY1305-SHA256/x1303   TLS_CHACHA20_POLY1305_SHA256 /g;
 # now the other lines, where we don't need to insert the additional space:
 $cat_csvfile  =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
-# Same with ECDH bit length
-$cat_csvfile  =~ s/ECDH 253/ECDH 256/g;
+# we changed above the ECDH bit length already
 
 $diff = diff \$cat_csvfile, \$cat_csvfile2;
 
