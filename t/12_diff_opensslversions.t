@@ -45,7 +45,7 @@ if ( $os eq "linux" ){
 system("@args") == 0
      or die ("FAILED: \"@args\"");
 
-# 2
+# 2 (LibreSSL in case of MacOS)
 printf "\n%s\n", "Test with $distro_openssl against \"$uri\" and save it";
 @args="$prg $check2run $csvfile2 --openssl=$distro_openssl $uri >/dev/null";
 system("@args") == 0
@@ -78,17 +78,20 @@ $cat_csvfile2 =~ s/.nonce-.* //g;
 $cat_csvfile  =~ s/","google.com\/.*","443/","google.com","443/g;
 $cat_csvfile2 =~ s/","google.com\/.*","443/","google.com","443/g;
 
-# Now address the differences for LibreSSL, see t/61_diff_testsslsh.t
-#
-# MacOS / LibreSSL has different OpenSSL names for TLS 1.3 ciphers. That should be rather solved in
-#       testssl.sh, see #2763. But for now we do this here.
-$cat_csvfile  =~ s/AEAD-AES128-GCM-SHA256/TLS_AES_128_GCM_SHA256/g;
-$cat_csvfile  =~ s/AEAD-AES256-GCM-SHA384/TLS_AES_256_GCM_SHA384/g;
-# this is a bit ugly but otherwise the line cipher-tls1_3_x1303 with the CHACHA20 cipher misses a space
-$cat_csvfile  =~ s/x1303   AEAD-CHACHA20-POLY1305-SHA256/x1303   TLS_CHACHA20_POLY1305_SHA256 /g;
-# now the other lines, where we don't need to insert the additional space:
-$cat_csvfile  =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
-# we changed above the ECDH bit length already
+
+if ( $os eq "darwin" ){
+     # Now address the differences for LibreSSL, see t/61_diff_testsslsh.t
+     #
+     # MacOS / LibreSSL has different OpenSSL names for TLS 1.3 ciphers. That should be rather solved in
+     # testssl.sh, see #2763. But for now we do this here.
+     $cat_csvfile2  =~ s/AEAD-AES128-GCM-SHA256/TLS_AES_128_GCM_SHA256/g;
+     $cat_csvfile2  =~ s/AEAD-AES256-GCM-SHA384/TLS_AES_256_GCM_SHA384/g;
+     # this is a bit ugly but otherwise the line cipher-tls1_3_x1303 with the CHACHA20 cipher misses a space
+     $cat_csvfile2  =~ s/x1303   AEAD-CHACHA20-POLY1305-SHA256/x1303   TLS_CHACHA20_POLY1305_SHA256 /g;
+     # now the other lines, where we don't need to insert the additional space:
+     $cat_csvfile2  =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
+     # we changed above the ECDH bit length already
+}
 
 $diff = diff \$cat_csvfile, \$cat_csvfile2;
 
