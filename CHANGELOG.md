@@ -3,7 +3,7 @@
 
 ### Features implemented / improvements in 3.2
 
-* Rating (SSL Labs)
+* Rating (SSL Labs), as of 3.2.2 version 2009r
 * Extend Server (cipher) preference: always now in wide mode instead of running all ciphers in the end (per default)
 * Remove "negotiated cipher / protocol"
 * Provide a better verdict wrt to server order: Now per protocol and ciphers are weighted for each protocol
