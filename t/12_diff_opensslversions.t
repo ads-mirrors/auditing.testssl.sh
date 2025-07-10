@@ -31,21 +31,34 @@ unlink $csvfile;
 unlink $csvfile2;
 
 #1 run
-
 if ( $os eq "linux" ){
+     # Comparison ~/bin/openssl.Linux.x86_64
      printf "\n%s\n", "Test with supplied openssl against \"$uri\" and save it";
      @args="$prg $check2run $csvfile $uri >/dev/null";
 } elsif ( $os eq "darwin" ){
-     # macos silicon doesn't have ~/bin/openssl.Darwin.arm64 binary so we use the
+     # MacOS silicon doesn't have ~/bin/openssl.Darwin.arm64 binary so we use the
      # homebrew version which was moved to /opt/homebrew/bin/openssl.NOPE in
-     # .github/workflows/unit_tests_macos.yml
-     printf "\n%s\n", "Test with homebrew's openssl 3.5.x against \"$uri\" and save it";
-     @args="$prg $check2run $csvfile --openssl /opt/homebrew/bin/openssl.NOPE $uri >/dev/null";
+     # .github/workflows/unit_tests_macos.yml . This gives us instead a comparison
+     # check from OpenSSL
+     # If this will be run outside GH actions, i.e. locally, we provide a fallback to
+     # /opt/homebrew/bin/openssl or just leave this thing
+     if ( -x "/opt/homebrew/bin/openssl.NOPE" ) {
+          printf "\n%s\n", "Test with homebrew's openssl 3.5.x against \"$uri\" and save it";
+          @args="$prg $check2run $csvfile --openssl /opt/homebrew/bin/openssl.NOPE $uri >/dev/null";
+     }
+     elsif ( -x "/opt/homebrew/bin/openssl" ) {
+          printf "\n%s\n", "Test with homebrew's openssl 3.5.x against \"$uri\" and save it";
+          @args="$prg $check2run $csvfile --openssl /opt/homebrew/bin/openssl $uri >/dev/null";
+     }
+     else {
+          die ("No alternative version to LibreSSL found");
+     }
 }
 system("@args") == 0
      or die ("FAILED: \"@args\"");
 
-# 2 (LibreSSL in case of MacOS)
+
+# 2 (LibreSSL in case of MacOS, /usr/bin/openssl for Linux)
 printf "\n%s\n", "Test with $distro_openssl against \"$uri\" and save it";
 @args="$prg $check2run $csvfile2 --openssl=$distro_openssl $uri >/dev/null";
 system("@args") == 0
