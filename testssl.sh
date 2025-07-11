@@ -17345,6 +17345,7 @@ run_ccs_injection(){
 
 
 # see https://blog.filippo.io/finding-ticketbleed/ |  https://filippo.io/ticketbleed/
+#
 run_ticketbleed() {
      local tls_hexcode tls_proto=""
      local sessticket_tls="" session_tckt_tls=""
@@ -17639,16 +17640,17 @@ run_opossum() {
      local cwe="CWE-74"
      local -i ret=0
      # we need to talk http here!
-     local uri=${URI/https/http/}
+     local uri=${URI/https/http}
      local service="$SERVICE"
 
      [[ -n "$STARTTLS" ]] && return 0
      [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Opossum vulnerability " && outln
      pr_bold " Opossum"; out " ($cve)                  "
 
-     # we're trying to connect also if ASSUME_HTTP is not set. Requirement is though HTTP/HTTPS in target
-     if [[ -z $service ]] && [[ $uri =~ ^http ]]; then
-          service=HTTP
+     # we're trying to connect also if ASSUME_HTTP is not set, there should be either one of following hints though
+     if [[ -z $service ]]; then
+          [[ $uri =~ ^http ]] && service=HTTP                    # https provided as target/URL
+          [[ "$CLIENT_AUTH" == required ]] && service=HTTP       # also try when client auth is requested (we dont use it over cleartext)
      fi
 
      case $service in
