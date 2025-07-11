@@ -17651,13 +17651,12 @@ run_opossum() {
                     *)   ret=7 ;;
                esac
                if [[ $response =~ Upgrade:\ TLS ]]; then
-                    pr_svrty_critical "VULNERABLE (NOT ok)"
+                    prln_svrty_critical "VULNERABLE (NOT ok)"
                     fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
                else
-                    pr_svrty_best "not vulnerable (OK)"
+                    prln_svrty_best "not vulnerable (OK)"
                     fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
                fi
-               echo
           ;;
           *) [[ $DEBUG -ge 1 ]] && echo "not implemented yet"
           ;;
