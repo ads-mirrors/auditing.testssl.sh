@@ -17369,7 +17369,7 @@ run_ticketbleed() {
      pr_bold " Ticketbleed"; out " ($cve), experiment.  "
 
      if [[ "$SERVICE" != HTTP ]] && [[ "$CLIENT_AUTH" != required ]]; then
-          outln "(applicable only for HTTPS)"
+          outln "(applicable only for HTTP service)"
           fileout "$jsonID" "INFO" "not applicable, not HTTP" "$cve" "$cwe"
           return 0
      fi
@@ -17638,14 +17638,22 @@ run_opossum() {
      local jsonID="opossum"
      local cwe="CWE-74"
      local -i ret=0
+     # we need to talk http here!
+     local uri=${URI/https/http/}
+     local service="$SERVICE"
 
      [[ -n "$STARTTLS" ]] && return 0
      [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Opossum vulnerability " && outln
      pr_bold " Opossum"; out " ($cve)                  "
 
-     case $SERVICE in
+     # we're trying to connect also if ASSUME_HTTP is not set. Requirement is though HTTP/HTTPS in target
+     if [[ -z $service ]] && [[ $uri =~ ^http ]]; then
+          service=HTTP
+     fi
+
+     case $service in
           HTTP)
-               response=$(http_get_header $NODE 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
+               response=$(http_get_header $uri 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
                case $? in
                     0)   ret=0 ;;
                     *)   ret=7 ;;
@@ -17658,10 +17666,15 @@ run_opossum() {
                     fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
                fi
           ;;
-          *) [[ $DEBUG -ge 1 ]] && echo "not implemented yet"
-          ;;
+          IMAP|FTP|POP3|SMTP|LMTP|NNTP)
+               outln "(implemented currently for HTTP only)"
+               fileout "$jsonID" "INFO" "not yet implemented" "$cve" "$cwe"
+               ;;
+          *)   outln "(applicable only for HTTP service)"
+               fileout "$jsonID" "INFO" "not applicable, not HTTP" "$cve" "$cwe"
+               ;;
      esac
-     return 0
+     return $ret
 }
 
 
