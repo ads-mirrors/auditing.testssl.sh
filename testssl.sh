@@ -1790,6 +1790,7 @@ filter_input() {
 # Proxy is not honored yet (see cmd line switches) -- except when using curl or wget.
 # There the environment variable is used automatically
 # Currently it is being used by check_revocation_crl() only.
+#
 http_get() {
      local proto z
      local node="" query=""
@@ -1864,51 +1865,55 @@ http_get() {
 # Outputs the headers when downloading any URL (arg1) via HTTP 1.1 GET from port 80.
 # Only works if curl or wget is available.
 # There the environment variable is used automatically
-# Currently it is being used by check_pwnedkeys() only.
+# Currently it is being used by check_pwnedkeys() and run_opossum()
+#
 http_get_header() {
      local proto
      local node="" query=""
-     local dl="$2"
+     local request_header="$2"
      local useragent="$UA_STD"
      local jsonID="http_get_header"
-     local headers
+     local response_headers
      local -i ret
 
      "$SNEAKY" && useragent="$UA_SNEAKY"
 
      if type -p curl &>/dev/null; then
+          timeout="--connect-timeout $HEADER_MAXSLEEP"
           if [[ -z "$PROXY" ]]; then
-               headers="$(curl --head -s  --noproxy '*' -A $''"$useragent"'' "$1")"
+               response_headers="$(curl --head -s $timeout --noproxy '*' -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           else
                # for the sake of simplicity assume the proxy is using http
-               headers="$(curl --head -s -x $PROXYIP:$PROXYPORT -A $''"$useragent"'' "$1")"
+               response_headers="$(curl --head -s $timeout -x $PROXYIP:$PROXYPORT -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           fi
           ret=$?
-          [[ $ret -eq 0 ]] && tm_out "$headers"
+          tm_out "$response_headers"
           return $ret
      elif type -p wget &>/dev/null; then
+          timeout="--timeout=$HEADER_MAXSLEEP --tries=0"
           # wget has no proxy command line. We need to use http_proxy instead. And for the sake of simplicity
           # assume the GET protocol we query is using http -- http_proxy is the $ENV not for the connection TO
           # the proxy, but for the protocol we query THROUGH the proxy
           if [[ -z "$PROXY" ]]; then
-               headers="$(wget --no-proxy -q -S -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+               response_headers="$(wget --no-proxy -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
           else
                if [[ -z "$http_proxy" ]]; then
-                    headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S  -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                else
-                    headers="$(wget -q -S -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(wget -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                fi
           fi
           ret=$?
-          [[ $ret -eq 0 ]] && tm_out "$headers"
+          tm_out "$response_headers"
           # wget(1): "8: Server issued an error response.". Happens e.g. when 404 is returned. However also if the call wasn't correct (400)
           # So we assume for now that everything is submitted correctly. We parse the error code too later
-          [[ $ret -eq 8 ]] && ret=0 && tm_out "$headers"
+          [[ $ret -eq 8 ]] && ret=0 && tm_out "$response_headers"
           return $ret
      else
           return 1
      fi
 }
+
 
 ldap_get() {
      local ldif
@@ -1940,6 +1945,7 @@ ldap_get() {
 #     1 - key not found in database
 #     2 - key found in database
 #     7 - network/proxy failure
+#
 check_pwnedkeys() {
      local cert="$1"
      local cert_key_algo="$2"
@@ -17625,6 +17631,41 @@ run_ticketbleed() {
      return $ret
 }
 
+# https://opossum-attack.com/, TLS Upgrade via old RFC 2817
+#
+run_opossum() {
+     local cve='CVE-2025-49812'
+     local jsonID="opossum"
+     local cwe="CWE-74"
+     local -i ret=0
+
+     [[ -n "$STARTTLS" ]] && return 0
+     [[ $VULN_COUNT -le $VULN_THRESHLD ]] && outln && pr_headlineln " Testing for Opossum vulnerability " && outln
+     pr_bold " Opossum"; out " ($cve)                  "
+
+     case $SERVICE in
+          HTTP)
+               response=$(http_get_header $NODE 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
+               case $? in
+                    0)   ret=0 ;;
+                    *)   ret=7 ;;
+               esac
+               if [[ $response =~ Upgrade:\ TLS ]]; then
+                    pr_svrty_critical "VULNERABLE (NOT ok)"
+                    fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
+               else
+                    pr_svrty_best "not vulnerable (OK)"; out "$append"
+                    fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
+               fi
+               echo
+          ;;
+          *) [[ $DEBUG -ge 1 ]] && echo "not implemented yet"
+          ;;
+     esac
+     return 0
+}
+
+
 # Overview @ http://www.exploresecurity.com/wp-content/uploads/custom/SSL_manual_cheatsheet.html
 #
 run_renego() {
@@ -21257,6 +21298,7 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -H, --heartbleed              tests for Heartbleed vulnerability
      -I, --ccs, --ccs-injection    tests for CCS injection vulnerability
      -T, --ticketbleed             tests for Ticketbleed vulnerability in BigIP loadbalancers
+     --OP, --opossum               tests for Opossum vulnerability
      --BB, --robot                 tests for Return of Bleichenbacher's Oracle Threat (ROBOT) vulnerability
      --SI, --starttls-injection    tests for STARTTLS injection issues
      -R, --renegotiation           tests for renegotiation vulnerabilities
@@ -23950,7 +23992,7 @@ set_rating_state() {
 
      # All of these should be enabled
      for gbl in do_protocols do_cipherlists do_fs do_server_defaults do_header \
-          do_heartbleed do_ccs_injection do_ticketbleed do_robot do_renego \
+          do_heartbleed do_ccs_injection do_ticketbleed do_opossum do_robot do_renego \
           do_crime do_ssl_poodle do_tls_fallback_scsv do_drown do_beast \
           do_rc4 do_logjam; do
           "${!gbl}" && ((nr_enabled++))
@@ -23980,6 +24022,7 @@ initialize_globals() {
      do_breach=false
      do_ccs_injection=false
      do_ticketbleed=false
+     do_opossum=false
      do_robot=false
      do_cipher_per_proto=false
      do_crime=false
@@ -24028,6 +24071,7 @@ set_scanning_defaults() {
      do_heartbleed="$OFFENSIVE"
      do_ccs_injection="$OFFENSIVE"
      do_ticketbleed="$OFFENSIVE"
+     do_opossum=true
      do_robot="$OFFENSIVE"
      do_crime=true
      do_freak=true
@@ -24048,9 +24092,9 @@ set_scanning_defaults() {
      do_tls_fallback_scsv=true
      do_client_simulation=true
      if "$OFFENSIVE"; then
-          VULN_COUNT=17
+          VULN_COUNT=18
      else
-          VULN_COUNT=13
+          VULN_COUNT=14
      fi
      do_rating=true
 }
@@ -24061,10 +24105,10 @@ count_do_variables() {
      local -i true_nr=0
 
      for gbl in do_allciphers do_vulnerabilities do_beast do_lucky13 do_breach do_ccs_injection do_ticketbleed do_cipher_per_proto do_crime \
-               do_freak do_logjam do_drown do_header do_heartbleed do_mx_all_ips do_fs do_protocols do_rc4 do_starttls_injection do_grease do_robot do_renego \
-               do_cipherlists do_server_defaults do_server_preference do_ssl_poodle do_tls_fallback_scsv do_winshock \
-               do_sweet32 do_client_simulation do_cipher_match do_tls_sockets do_mass_testing do_display_only do_rating; do
-                    "${!gbl}" && ((true_nr++))
+          do_freak do_logjam do_drown do_header do_heartbleed do_mx_all_ips do_fs do_protocols do_rc4 do_starttls_injection do_grease \
+          do_opossum do_robot do_renego do_cipherlists do_server_defaults do_server_preference do_ssl_poodle do_tls_fallback_scsv \
+          do_winshock  do_sweet32 do_client_simulation do_cipher_match do_tls_sockets do_mass_testing do_display_only do_rating; do
+               "${!gbl}" && ((true_nr++))
      done
      return $true_nr
 }
@@ -24074,10 +24118,10 @@ debug_globals() {
      local gbl
 
      for gbl in do_allciphers do_vulnerabilities do_beast do_lucky13 do_breach do_ccs_injection do_ticketbleed do_cipher_per_proto do_crime \
-               do_freak do_logjam do_drown do_header do_heartbleed do_mx_all_ips do_fs do_protocols do_rc4 do_starttls_injection do_grease do_robot do_renego \
-               do_cipherlists do_server_defaults do_server_preference do_ssl_poodle do_tls_fallback_scsv do_winshock \
-               do_sweet32 do_client_simulation do_cipher_match do_tls_sockets do_mass_testing do_display_only do_rating; do
-          printf "%-22s = %s\n" $gbl "${!gbl}"
+          do_freak do_logjam do_drown do_header do_heartbleed do_mx_all_ips do_fs do_protocols do_rc4 do_starttls_injection do_grease\
+          do_opossum do_robot do_renego do_cipherlists do_server_defaults do_server_preference do_ssl_poodle do_tls_fallback_scsv \
+          do_winshock do_sweet32 do_client_simulation do_cipher_match do_tls_sockets do_mass_testing do_display_only do_rating; do
+               printf "%-22s = %s\n" $gbl "${!gbl}"
      done
      # ${!var} is an indirect expansion, see https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
      # Example: https://stackoverflow.com/questions/8515411/what-is-indirect-expansion-what-does-var-mean#8515492
@@ -24283,6 +24327,7 @@ parse_cmd_line() {
                     do_heartbleed="$OFFENSIVE"
                     do_ccs_injection="$OFFENSIVE"
                     do_ticketbleed="$OFFENSIVE"
+                    do_opossum=true
                     do_robot="$OFFENSIVE"
                     do_renego=true
                     do_crime=true
@@ -24299,9 +24344,9 @@ parse_cmd_line() {
                     do_rc4=true
                     do_starttls_injection=true
                     if "$OFFENSIVE"; then
-                         VULN_COUNT=17
+                         VULN_COUNT=18
                     else
-                         VULN_COUNT=13
+                         VULN_COUNT=14
                     fi
                     ;;
                --ids-friendly)
@@ -24317,6 +24362,10 @@ parse_cmd_line() {
                     ;;
                -T|--ticketbleed)
                     do_ticketbleed=true
+                    ((VULN_COUNT++))
+                    ;;
+               --OP|--opossum)
+                    do_opossum=true
                     ((VULN_COUNT++))
                     ;;
                -BB|--BB|--robot)
@@ -24984,6 +25033,7 @@ lets_roll() {
                "$do_heartbleed" && { run_heartbleed; ret=$(($? + ret)); stopwatch run_heartbleed; }
                "$do_ccs_injection" && { run_ccs_injection; ret=$(($? + ret)); stopwatch run_ccs_injection; }
                "$do_ticketbleed" && { run_ticketbleed; ret=$(($? + ret)); stopwatch run_ticketbleed; }
+               "$do_opossum" && { run_opossum; ret=$(($? + ret)); stopwatch run_opossum; }
                "$do_robot" && { run_robot; ret=$(($? + ret)); stopwatch run_robot; }
                "$do_renego" && { run_renego; ret=$(($? + ret)); stopwatch run_renego; }
                "$do_crime" && { run_crime; ret=$(($? + ret)); stopwatch run_crime; }
