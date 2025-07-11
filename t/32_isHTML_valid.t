@@ -10,7 +10,7 @@ use Text::Diff;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $uri="testssl.net";
+my $uri="heise.de";
 my $out="";
 my $html="";
 my $debughtml="";
