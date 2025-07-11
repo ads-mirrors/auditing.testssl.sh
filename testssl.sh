@@ -1792,7 +1792,7 @@ filter_input() {
 # Currently it is being used by check_revocation_crl() only.
 #
 http_get() {
-     local proto z
+     local proto="" foo=""
      local node="" query=""
      local dl="$2"
      local useragent="$UA_STD"
@@ -1845,7 +1845,7 @@ http_get() {
                     printf -- "%b" "GET $proto://$node/$query HTTP/1.0\r\nUser-Agent: $useragent\r\nHost: $node\r\nAccept: */*\r\n\r\n" >&33
                fi
           else
-               IFS=/ read -r proto z node query <<< "$1"
+               IFS=/ read -r proto foo node query <<< "$1"
                exec 33<>/dev/tcp/$node/80
                printf -- "%b" "GET /$query HTTP/1.0\r\nUser-Agent: $useragent\r\nHost: $node\r\nAccept: */*\r\n\r\n" >&33
           fi
@@ -1920,21 +1920,22 @@ http_get_header() {
 #    arg1: URL
 #    arg2: extra http header
 #
+# return codes:
+#    0: all fine
+#    1: got stuck within HEADER_MAXSLEEP
+#    3: got stuck within HEADER_MAXSLEEP and PROXY was defined
+#
 http_header_printf() {
      local request_header="$2"
      local useragent="$UA_STD"
      local tmpfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf.log
      local errfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf-err.log
-     local - ret=0
+     local -i ret=0
+     local proto="" foo="" node="" query=""
 
      [[ $DEBUG -eq 0 ]] && errfile=/dev/null
 
      IFS=/ read -r proto foo node query <<< "$1"
-     echo  $proto
-     echo  $foo
-     echo $node
-     echo $query
-
      exec 33<>/dev/tcp/$node/80
      printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile &
      wait_kill $! $HEADER_MAXSLEEP
@@ -17683,7 +17684,6 @@ run_opossum() {
      local jsonID="opossum"
      local cwe="CWE-74"
      local -i ret=0
-     # we need to talk http here!
      local uri=$URI
      local service="$SERVICE"
 
@@ -17700,9 +17700,10 @@ run_opossum() {
           HTTP)
                uri=${URI/https:\/\//}
                response=$(http_header_printf http://${uri} 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
+               # In any case we use $response but we handle the return codes
                case $? in
                     0)   ret=0 ;;
-                    *)   ret=7 ;;
+                    1|3) ret=7 ;;       # got stuck
                esac
                if [[ $response =~ Upgrade:\ TLS ]]; then
                     prln_svrty_critical "VULNERABLE (NOT ok)"
