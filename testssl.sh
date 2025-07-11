@@ -1890,7 +1890,7 @@ http_get_header() {
           tm_out "$response_headers"
           return $ret
      elif type -p wget &>/dev/null; then
-          timeout="--timeout=$HEADER_MAXSLEEP --tries=0"
+          timeout="--timeout=$HEADER_MAXSLEEP --tries=1"
           # wget has no proxy command line. We need to use http_proxy instead. And for the sake of simplicity
           # assume the GET protocol we query is using http -- http_proxy is the $ENV not for the connection TO
           # the proxy, but for the protocol we query THROUGH the proxy
@@ -17654,7 +17654,7 @@ run_opossum() {
                     pr_svrty_critical "VULNERABLE (NOT ok)"
                     fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
                else
-                    pr_svrty_best "not vulnerable (OK)"; out "$append"
+                    pr_svrty_best "not vulnerable (OK)"
                     fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
                fi
                echo
