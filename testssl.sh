@@ -1863,44 +1863,46 @@ http_get() {
 }
 
 # Outputs the headers when downloading any URL (arg1) via HTTP 1.1 GET from port 80.
+# arg2 is optional and could be a http_header
+#
 # Only works if curl or wget is available.
-# There the environment variable is used automatically
-# Currently it is being used by check_pwnedkeys() and run_opossum()
+# The proxy environment variable is used automatically.
+# Currently it is being used by check_pwnedkeys(), only
 #
 http_get_header() {
      local proto
      local node="" query=""
      local request_header="$2"
      local useragent="$UA_STD"
-     local jsonID="http_get_header"
-     local response_headers
+     local response_headers=""
+     local xtra_params=""
      local -i ret
 
      "$SNEAKY" && useragent="$UA_SNEAKY"
 
      if type -p curl &>/dev/null; then
-          timeout="--connect-timeout $HEADER_MAXSLEEP"
+          xtra_params="--connect-timeout $HEADER_MAXSLEEP --head -s"
           if [[ -z "$PROXY" ]]; then
-               response_headers="$(curl --head -s $timeout --noproxy '*' -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
+               response_headers="$(curl $xtra_params --noproxy '*' -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           else
                # for the sake of simplicity assume the proxy is using http
-               response_headers="$(curl --head -s $timeout -x $PROXYIP:$PROXYPORT -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
+               response_headers="$(curl $xtra_params -x $PROXYIP:$PROXYPORT -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           fi
           ret=$?
           tm_out "$response_headers"
           return $ret
      elif type -p wget &>/dev/null; then
-          timeout="--timeout=$HEADER_MAXSLEEP --tries=1"
+          xtra_params="--timeout=$HEADER_MAXSLEEP --tries=1 --content-on-error --cache=off"
           # wget has no proxy command line. We need to use http_proxy instead. And for the sake of simplicity
           # assume the GET protocol we query is using http -- http_proxy is the $ENV not for the connection TO
           # the proxy, but for the protocol we query THROUGH the proxy
           if [[ -z "$PROXY" ]]; then
-               response_headers="$(wget --no-proxy -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+               response_headers="$(wget --no-proxy -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
           else
                if [[ -z "$http_proxy" ]]; then
-                    response_headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                else
-                    response_headers="$(wget -q -S $timeout --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(wget -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                fi
           fi
           ret=$?
@@ -1912,6 +1914,48 @@ http_get_header() {
      else
           return 1
      fi
+}
+
+# does a simple http head via printf with no proxy, only used by do_opossum
+#    arg1: URL
+#    arg2: extra http header
+#
+http_header_printf() {
+     local request_header="$2"
+     local useragent="$UA_STD"
+     local tmpfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf.log
+     local errfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf-err.log
+     local - ret=0
+
+     [[ $DEBUG -eq 0 ]] && errfile=/dev/null
+
+     IFS=/ read -r proto foo node query <<< "$1"
+     echo  $proto
+     echo  $foo
+     echo $node
+     echo $query
+
+     exec 33<>/dev/tcp/$node/80
+     printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile &
+     wait_kill $! $HEADER_MAXSLEEP
+     if [[ $? -ne 0 ]]; then
+          # not killed
+          if [[ -n "$PROXY" ]]; then
+               ret=3
+          fi
+          ret=1
+     else
+          ret=0
+     fi
+     if [[ $DEBUG -eq 0 ]] ; then
+          cat <&33
+     else
+          cat <&33 >$tmpfile
+          cat $tmpfile
+     fi
+     exec 33<&-
+     exec 33>&-
+     return $ret
 }
 
 
@@ -17640,7 +17684,7 @@ run_opossum() {
      local cwe="CWE-74"
      local -i ret=0
      # we need to talk http here!
-     local uri=${URI/https/http}
+     local uri=$URI
      local service="$SERVICE"
 
      [[ -n "$STARTTLS" ]] && return 0
@@ -17652,10 +17696,10 @@ run_opossum() {
           [[ $uri =~ ^http ]] && service=HTTP                    # https provided as target/URL
           [[ "$CLIENT_AUTH" == required ]] && service=HTTP       # also try when client auth is requested (we dont use it over cleartext)
      fi
-
      case $service in
           HTTP)
-               response=$(http_get_header $uri 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
+               uri=${URI/https:\/\//}
+               response=$(http_header_printf http://${uri} 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
                case $? in
                     0)   ret=0 ;;
                     *)   ret=7 ;;
