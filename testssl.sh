@@ -24006,7 +24006,7 @@ set_rating_state() {
 
      # All of these should be enabled
      for gbl in do_protocols do_cipherlists do_fs do_server_defaults do_header \
-          do_heartbleed do_ccs_injection do_ticketbleed do_opossum do_robot do_renego \
+          do_heartbleed do_ccs_injection do_ticketbleed do_robot do_renego \
           do_crime do_ssl_poodle do_tls_fallback_scsv do_drown do_beast \
           do_rc4 do_logjam; do
           "${!gbl}" && ((nr_enabled++))
