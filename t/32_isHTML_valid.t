@@ -48,7 +48,7 @@ $edited_html =~ s/&apos;/'/g;
 
 $diff = diff \$edited_html, \$out;
 
-cmp_ok($edited_html, "eq", $out, "Checking if HTML file matches terminal output") or
+ok($edited_html eq $out, "Checking if HTML file matches terminal output") or
      diag ("\n%s\n", "$diff");
 
 $tests++;
