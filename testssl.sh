@@ -1785,7 +1785,7 @@ filter_input() {
 
 # Dl any URL (arg1) via HTTP 1.1 GET from port 80 or 443 (curl/wget). arg2: file to store http body.
 # Proxy is not honored yet (see cmd line switches) -- except when using curl or wget.
-# The PROXY environment variable is used when specifiied
+# The PROXY environment variable is used when specified
 # Currently this is being used by check_revocation_crl() only.
 #
 http_get() {
@@ -19947,7 +19947,7 @@ run_starttls_injection() {
      $SOCAT FD:5 UNIX-LISTEN:$uds 2>/dev/null &
      socat_pid=$!
 
-     if "$HAS_DS"; then
+     if "$HAS_UDS"; then
           openssl_bin="$OPENSSL"
      elif "$HAS2_UDS"; then
           openssl_bin="$OPENSSL2"
