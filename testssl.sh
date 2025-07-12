@@ -367,7 +367,7 @@ HAS_AES128_GCM=false
 HAS_AES256_GCM=false
 HAS_ZLIB=false
 HAS_UDS=false
-HAS_UDS2=false
+HAS2_UDS=false
 HAS_ENABLE_PHA=false
 HAS_DIG=false
 HAS_DIG_R=true
@@ -1783,12 +1783,13 @@ filter_input() {
      sed -e 's/#.*$//' -e '/^$/d' <<< "$1" | tr -d '\n' | tr -d '\t' | tr -d '\r'
 }
 
-# Dl's any URL (arg1) via HTTP 1.1 GET from port 80, arg2: file to store http body.
+# Dl any URL (arg1) via HTTP 1.1 GET from port 80 or 443 (curl/wget). arg2: file to store http body.
 # Proxy is not honored yet (see cmd line switches) -- except when using curl or wget.
-# There the environment variable is used automatically
-# Currently it is being used by check_revocation_crl() only.
+# The PROXY environment variable is used when specifiied
+# Currently this is being used by check_revocation_crl() only.
+#
 http_get() {
-     local proto z
+     local proto="" foo=""
      local node="" query=""
      local dl="$2"
      local useragent="$UA_STD"
@@ -1822,7 +1823,7 @@ http_get() {
           # Worst option: slower and hiccups with chunked transfers. Workaround for the
           # latter is using HTTP/1.0. We do not support https here, yet.
           # First the URL will be split
-          IFS=/ read -r proto z node query <<< "$1"
+          IFS=/ read -r proto foo node query <<< "$1"
           proto=${proto%:}
           if [[ "$proto" != http ]]; then
                pr_warning "protocol $proto not supported yet"
@@ -1841,7 +1842,7 @@ http_get() {
                     printf -- "%b" "GET $proto://$node/$query HTTP/1.0\r\nUser-Agent: $useragent\r\nHost: $node\r\nAccept: */*\r\n\r\n" >&33
                fi
           else
-               IFS=/ read -r proto z node query <<< "$1"
+               IFS=/ read -r proto foo node query <<< "$1"
                exec 33<>/dev/tcp/$node/80
                printf -- "%b" "GET /$query HTTP/1.0\r\nUser-Agent: $useragent\r\nHost: $node\r\nAccept: */*\r\n\r\n" >&33
           fi
@@ -1858,49 +1859,55 @@ http_get() {
      fi
 }
 
-# Outputs the headers when downloading any URL (arg1) via HTTP 1.1 GET from port 80.
+# Outputs the HTTP headers via HTTP 1.1 HEAD command via HTTPS and a valid certificate
+#    arg1 is the URL
+#    arg2 is optional and could be a request header. curl/wget don't send empty headers otherwise
+#
 # Only works if curl or wget is available.
-# There the environment variable is used automatically
-# Currently it is being used by check_pwnedkeys() only.
-http_get_header() {
+# The proxy environment variable is used automatically.
+# Currently it is being used by check_pwnedkeys() only
+#
+http_head() {
      local proto
      local node="" query=""
-     local dl="$2"
+     local request_header="$2"
      local useragent="$UA_STD"
-     local jsonID="http_get_header"
-     local headers
+     local response_headers=""
+     local xtra_params=""
      local -i ret
 
      "$SNEAKY" && useragent="$UA_SNEAKY"
 
      if type -p curl &>/dev/null; then
+          xtra_params="--connect-timeout $HEADER_MAXSLEEP --head -s"
           if [[ -z "$PROXY" ]]; then
-               headers="$(curl --head -s  --noproxy '*' -A $''"$useragent"'' "$1")"
+               response_headers="$(curl $xtra_params --noproxy '*' -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           else
                # for the sake of simplicity assume the proxy is using http
-               headers="$(curl --head -s -x $PROXYIP:$PROXYPORT -A $''"$useragent"'' "$1")"
+               response_headers="$(curl $xtra_params -x $PROXYIP:$PROXYPORT -H $''"$request_header"'' -A $''"$useragent"'' "$1")"
           fi
           ret=$?
-          [[ $ret -eq 0 ]] && tm_out "$headers"
+          [[ $ret -eq 0 ]] && tm_out "$response_headers"
           return $ret
      elif type -p wget &>/dev/null; then
+          xtra_params="--timeout=$HEADER_MAXSLEEP --tries=1 --cache=off"
           # wget has no proxy command line. We need to use http_proxy instead. And for the sake of simplicity
           # assume the GET protocol we query is using http -- http_proxy is the $ENV not for the connection TO
           # the proxy, but for the protocol we query THROUGH the proxy
           if [[ -z "$PROXY" ]]; then
-               headers="$(wget --no-proxy -q -S -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+               response_headers="$(wget --no-proxy -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
           else
                if [[ -z "$http_proxy" ]]; then
-                    headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S  -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(http_proxy=http://$PROXYIP:$PROXYPORT wget -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                else
-                    headers="$(wget -q -S -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
+                    response_headers="$(wget -q -S $xtra_params --header $''"$request_header"'' -U $''"$useragent"'' -O /dev/null "$1" 2>&1)"
                fi
           fi
           ret=$?
-          [[ $ret -eq 0 ]] && tm_out "$headers"
+          [[ $ret -eq 0 ]] && tm_out "$response_headers"
           # wget(1): "8: Server issued an error response.". Happens e.g. when 404 is returned. However also if the call wasn't correct (400)
           # So we assume for now that everything is submitted correctly. We parse the error code too later
-          [[ $ret -eq 8 ]] && ret=0 && tm_out "$headers"
+          [[ $ret -eq 8 ]] && ret=0 && tm_out "$response_headers"
           return $ret
      else
           return 1
@@ -1937,6 +1944,7 @@ ldap_get() {
 #     1 - key not found in database
 #     2 - key found in database
 #     7 - network/proxy failure
+#
 check_pwnedkeys() {
      local cert="$1"
      local cert_key_algo="$2"
@@ -1966,7 +1974,7 @@ check_pwnedkeys() {
      fi
      fingerprint="$($OPENSSL pkey -pubin -outform DER <<< "$pubkey" 2>/dev/null | $OPENSSL dgst -sha256 -hex 2>/dev/null)"
      fingerprint="${fingerprint#*= }"
-     response="$(http_get_header "https://v1.pwnedkeys.com/$fingerprint")"
+     response="$(http_head "https://v1.pwnedkeys.com/$fingerprint")"
      # Handle curl's/wget's connectivity exit codes
      case $? in
           4|5|7)     return 7 ;;
@@ -5472,6 +5480,7 @@ add_proto_offered() {
 # arg1:    protocol string or hex code for TLS protocol
 # echos:   0 if proto known being offered, 1: known not being offered, 2: we don't know yet whether proto is being offered
 # return value is always zero
+#
 has_server_protocol() {
      local proto
      local proto_val_pair
@@ -5506,6 +5515,7 @@ has_server_protocol() {
 
 
 # the protocol check needs to be revamped. It sucks, see above
+#
 run_protocols() {
      local using_sockets=true
      local supported_no_ciph1="supported but couldn't detect a cipher (may need debugging)"
@@ -9873,7 +9883,7 @@ certificate_info() {
           check_pwnedkeys "$HOSTCERT" "$cert_key_algo" "$cert_keysize"
           case "$?" in
                0) outln "not checked"; fileout "pwnedkeys${json_postfix}" "INFO" "not checked" ;;
-               1) outln "not in database"; fileout "pwnedkeys${json_postfix}" "INFO" "not in database" ;;
+               1) pr_svrty_good "not in database"; fileout "pwnedkeys${json_postfix}" "OK" "not in database" ;;
                2) pr_svrty_critical "NOT ok --"; outln " key appears in database"; fileout "pwnedkeys${json_postfix}" "CRITICAL" "private key is known" ;;
                7) prln_warning "error querying https://v1.pwnedkeys.com"; fileout "pwnedkeys${json_postfix}" "WARN" "connection error" ;;
           esac
@@ -17290,6 +17300,7 @@ run_ccs_injection(){
 
 
 # see https://blog.filippo.io/finding-ticketbleed/ |  https://filippo.io/ticketbleed/
+#
 run_ticketbleed() {
      local tls_hexcode tls_proto=""
      local sessticket_tls="" session_tckt_tls=""
@@ -17314,7 +17325,7 @@ run_ticketbleed() {
      pr_bold " Ticketbleed"; out " ($cve), experiment.  "
 
      if [[ "$SERVICE" != HTTP ]] && [[ "$CLIENT_AUTH" != required ]]; then
-          outln "(applicable only for HTTPS)"
+          outln "(applicable only for HTTP service)"
           fileout "$jsonID" "INFO" "not applicable, not HTTP" "$cve" "$cwe"
           return 0
      fi
@@ -19912,7 +19923,7 @@ run_starttls_injection() {
           outln "Need socat for this check"
           return 1
      fi
-     if ! "$HAS_UDS2" && ! "$HAS_UDS"; then
+     if ! "$HAS2_UDS" && ! "$HAS_UDS"; then
           fileout "$jsonID" "WARN" "Need OpenSSL with Unix-domain socket s_client support for this check" "$cve" "$cwe" "$hint"
           outln "Need an OpenSSL with Unix-domain socket s_client support for this check"
           return 1
@@ -19936,9 +19947,9 @@ run_starttls_injection() {
      $SOCAT FD:5 UNIX-LISTEN:$uds 2>/dev/null &
      socat_pid=$!
 
-     if "$HAS_UDS"; then
+     if "$HAS_DS"; then
           openssl_bin="$OPENSSL"
-     elif "$HAS_UDS2"; then
+     elif "$HAS2_UDS"; then
           openssl_bin="$OPENSSL2"
      fi
      # normally the interesting fallback we grep later for is in fd2 but we'll catch also stdout here
@@ -20696,7 +20707,7 @@ find_openssl_binary() {
      local s_client_has=$TEMPDIR/s_client_has.txt
      local s_client_has2=$TEMPDIR/s_client_has2.txt
      local s_client_starttls_has=$TEMPDIR/s_client_starttls_has.txt
-     local s_client_starttls_has2=$TEMPDIR/s_client_starttls_has2
+     local s_client2_starttls_has=$TEMPDIR/s_client2_starttls_has
      local openssl_location="" cwd=""
      local curve="" ossl_tls13_supported_curves
      local ossl_line1="" yr=""
@@ -20843,7 +20854,7 @@ find_openssl_binary() {
      HAS_AES256_GCM=false
      HAS_ZLIB=false
      HAS_UDS=false
-     HAS_UDS2=false
+     HAS2_UDS=false
      TRUSTED1ST=""
      HAS_ENABLE_PHA=false
 
@@ -20882,11 +20893,10 @@ find_openssl_binary() {
 
      $OPENSSL s_client -noservername </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NOSERVERNAME=true
      $OPENSSL s_client -ciphersuites </dev/null 2>&1 | grep -aiq "unknown option" || HAS_CIPHERSUITES=true
-
-     $OPENSSL ciphers @SECLEVEL=0:ALL > /dev/null 2> /dev/null && HAS_SECLEVEL=true
-
      $OPENSSL s_client -comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_COMP=true
      $OPENSSL s_client -no_comp </dev/null 2>&1 | grep -aiq "unknown option" || HAS_NO_COMP=true
+
+     $OPENSSL ciphers @SECLEVEL=0:ALL > /dev/null 2> /dev/null && HAS_SECLEVEL=true
 
      OPENSSL_NR_CIPHERS=$(count_ciphers "$(actually_supported_osslciphers 'ALL:COMPLEMENTOFALL' 'ALL')")
 
@@ -20993,9 +21003,9 @@ find_openssl_binary() {
           # We also check, whether there's $OPENSSL2 which has TLS 1.3
           if [[ ! "$OSSL_NAME" =~ LibreSSL ]] && [[ ! $OSSL_VER =~ 1.1.1 ]] && [[ $OSSL_VER_MAJOR -lt 3 ]]; then
                OPENSSL_CONF='' $OPENSSL2 s_client -help 2>$s_client_has2
-               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client_starttls_has2
-               grep -q 'Unix-domain socket' $s_client_has2 && HAS_UDS2=true
-               grep -q 'xmpp-server' $s_client_starttls_has2 && HAS_XMPP_SERVER2=true
+               OPENSSL_CONF='' $OPENSSL2 s_client -starttls foo 2>$s_client2_starttls_has
+               grep -q 'Unix-domain socket' $s_client_has2 && HAS2_UDS=true
+               grep -q 'xmpp-server' $s_client2_starttls_has && HAS_XMPP_SERVER2=true
                # Likely we don't need the following second check here, see 6 lines above
                if grep -wq 'tls1_3' $s_client_has2; then
                     OPENSSL_CONF='' OPENSSL2_HAS_TLS_1_3=true
@@ -21191,7 +21201,7 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -E, --cipher-per-proto        checks those per protocol
      -s, --std, --categories       tests standard cipher categories by strength
      -f, --fs, --forward-secrecy   checks forward secrecy settings
-     -p, --protocols               checks TLS/SSL protocols (including SPDY/HTTP2)
+     -p, --protocols               checks TLS/SSL protocols (including ALPN/HTTP2 and SPDY)
      -g, --grease                  tests several server implementation bugs like GREASE and size limitations
      -S, --server-defaults         displays the server's default picks and certificate info
      -P, --server-preference       displays the server's picks: protocol+cipher
@@ -21375,7 +21385,7 @@ HAS_SIEVE: $HAS_SIEVE
 HAS_NNTP: $HAS_NNTP
 HAS_IRC: $HAS_IRC
 HAS_UDS: $HAS_UDS
-HAS_UDS2: $HAS_UDS2
+HAS2_UDS: $HAS2_UDS
 HAS_ENABLE_PHA: $HAS_ENABLE_PHA
 
 HAS_DIG: $HAS_DIG
