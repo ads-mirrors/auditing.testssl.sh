@@ -21651,9 +21651,8 @@ get_https_rrecord() {
      local noidnout=""
      local svc_priority=""
 
-     "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
-
      [[ -n "$NODNS" ]] && return 2          # if minimum DNS lookup was instructed, leave here
+     "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
 
      # There's a) the possibility to query HTTPS RR records directly like "dig +short HTTPS dev.testssl.sh",
      # "drill HTTPS FQDN" or "nslookup -type=HTTPS FQDN". This works for newer binaries only, unfortunately.
@@ -21662,8 +21661,8 @@ get_https_rrecord() {
      #      testssl.net has TYPE65 record \# 136 00010000010006026833026832000400086815229AAC43CDE7000500 470045FE0D0041A70020002057F87361C7B5A3B8CD3C028892690D35 2863623DAD4E03D33B231A4C3C8BB02B0004000100010012636C6F75 64666C6172652D6563682E636F6D0000000600202606470030310000 00000000AC43CDE72606470030360000000000006815229A
      #    $ host -t HTTPS testssl.net
      #      testssl.net has HTTPS record 1 . alpn="h3,h2" ipv4hint=104.21.34.154,172.67.205.231 ech=AEX+DQBBpwAgACBX+HNhx7WjuM08AoiSaQ01KGNiPa1OA9M7IxpMPIuwKwAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:3031::ac43:cde7,2606:4700:3036::6815:229a
-     # ECH ist the e)ncrypted c)lient h)ello --> for esni (https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
-     # Nice descrption: https://www.netmeister.org/blog/https-rrs.html
+     # ECH is the encrypted client hello --> for esni (https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
+     # Nice descirption: https://www.netmeister.org/blog/https-rrs.html
 
      # Thus we try first whether we can query the HTTPS records directly as this gives us that already
      # in clear text and also we can avoid to parse the encoded format. We'll do that as a fallback but
