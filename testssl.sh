@@ -21662,7 +21662,7 @@ get_https_rrecord() {
      #    $ host -t HTTPS testssl.net
      #      testssl.net has HTTPS record 1 . alpn="h3,h2" ipv4hint=104.21.34.154,172.67.205.231 ech=AEX+DQBBpwAgACBX+HNhx7WjuM08AoiSaQ01KGNiPa1OA9M7IxpMPIuwKwAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:3031::ac43:cde7,2606:4700:3036::6815:229a
      # ECH is the encrypted client hello --> for esni (https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
-     # Nice descirption: https://www.netmeister.org/blog/https-rrs.html
+     # Nice description: https://www.netmeister.org/blog/https-rrs.html
 
      # Thus we try first whether we can query the HTTPS records directly as this gives us that already
      # in clear text and also we can avoid to parse the encoded format. We'll do that as a fallback but
@@ -21752,7 +21752,7 @@ get_https_rrecord() {
                while read hash len line ;do
                #           \#  10  00010000010003026832
                     if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.1
-                         svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probbaly not needed) type casting. 0 is alias
+                         svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probably not needed) type casting. 0 is alias
                          if [[ ${line:8:2} != 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
                               continue                                               # If the first element is not alpn, next iteration of loop will fail.
                          fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
