@@ -375,6 +375,11 @@ HAS_IDN=false
 HAS_IDN2=false
 HAS_AVAHIRESOLVE=false
 HAS_DIG_NOIDNOUT=false
+HAS_DIG_HTTPS=false                     # *_HTTPS: whether the binaries support HTTPS RR directly
+HAS_DRILL_HTTPS=false
+HAS_HOST_HTTPS=false
+HAS_NSLOOKUP_HTTPS=false
+
 HAS_XXD=false
 
 OSSL_CIPHERS_S=""
@@ -21392,6 +21397,8 @@ get_local_a() {
 #
 check_resolver_bins() {
      local saved_openssl_conf="$OPENSSL_CONF"
+     local testhost=localhost
+     local str=""
 
      OPENSSL_CONF=""                         # see https://github.com/testssl/testssl.sh/issues/134
      type -p dig   &> /dev/null &&  HAS_DIG=true
@@ -21415,12 +21422,36 @@ check_resolver_bins() {
                HAS_DIG_NOIDNOUT=true
           fi
      fi
+
+     # Pre-checking the following for HTTPS RR, see get_https_rrecord()
+     if "$HAS_DIG"; then
+          str=$(dig +short $testhost HTTPS)
+          if [[ -z "$str" ]] && [[ ! "$str" =~ 127.0.0.1 ]] ; then
+               HAS_DIG_HTTPS=true
+          fi
+     elif "$HAS_DRILL"; then
+          if drill $testhost HTTPS | grep -Eq 'IN.*HTTPS'; then
+               HAS_DRILL_HTTPS=true
+          fi
+     elif "$HAS_HOST"; then
+          host -t HTTPS $testhost 2>&1 | grep -q 'invalid type'
+          if [[ $? -ne 0 ]]; then
+               HAS_HOST_HTTPS=true
+          fi
+     elif "$HAS_NSLOOKUP"; then
+          nslookup -type=HTTPS $testhost | grep -q 'unknown query type'
+          if [[ $? -ne 0 ]]; then
+               HAS_NSLOOKUP_HTTPS=true
+          fi
+     fi
+
      OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/testssl/testssl.sh/issues/134
      return 0
 }
 
 # arg1: a host name. Returned will be 0-n IPv4 addresses
 # watch out: $1 can also be a cname! --> all checked
+#
 get_a_record() {
      local ip4=""
      local saved_openssl_conf="$OPENSSL_CONF"
@@ -21469,6 +21500,7 @@ get_a_record() {
 
 # arg1: a host name. Returned will be 0-n IPv6 addresses
 # watch out: $1 can also be a cname! --> all checked
+#
 get_aaaa_record() {
      local ip6=""
      local saved_openssl_conf="$OPENSSL_CONF"
@@ -21518,6 +21550,7 @@ get_aaaa_record() {
 # RFC6844: DNS Certification Authority Authorization (CAA) Resource Record
 # arg1: domain to check for
 #FIXME: should be refactored, see get_https_rrecord()
+#
 get_caa_rrecord() {
      local raw_caa=""
      local hash len line
@@ -21603,8 +21636,8 @@ get_caa_rrecord() {
      return 0
 }
 
-# See https://www.rfc-editor.org/rfc/rfc9460.html:
-# Service Binding and Parameter Specification via the DNS (SVCB and HTTPS Resource Records)
+# Service Binding and Parameter Specification via the DNS (SVCB and HTTPS Resource Records).
+# https://www.rfc-editor.org/rfc/rfc9460.html
 # arg1: domain to check for
 #
 get_https_rrecord() {
@@ -21616,12 +21649,41 @@ get_https_rrecord() {
      local saved_openssl_conf="$OPENSSL_CONF"
      local all_https=""
      local noidnout=""
+     local svc_priority=""
 
      "$HAS_DIG_NOIDNOUT" && noidnout="+noidnout"
 
      [[ -n "$NODNS" ]] && return 2          # if minimum DNS lookup was instructed, leave here
 
-     # Ff there's a type65 record there are 2x3 output formats, mostly depending on age of distribution
+     # There's a) the possibility to query HTTPS RR records directly like "dig +short HTTPS dev.testssl.sh",
+     # "drill HTTPS FQDN" or "nslookup -type=HTTPS FQDN". This works for newer binaries only, unfortunately.
+     # On top of that b) there's also an extended format which e.g. cloudflare uses:
+     #    $ host -t type65 testssl.net
+     #      testssl.net has TYPE65 record \# 136 00010000010006026833026832000400086815229AAC43CDE7000500 470045FE0D0041A70020002057F87361C7B5A3B8CD3C028892690D35 2863623DAD4E03D33B231A4C3C8BB02B0004000100010012636C6F75 64666C6172652D6563682E636F6D0000000600202606470030310000 00000000AC43CDE72606470030360000000000006815229A
+     #    $ host -t HTTPS testssl.net
+     #      testssl.net has HTTPS record 1 . alpn="h3,h2" ipv4hint=104.21.34.154,172.67.205.231 ech=AEX+DQBBpwAgACBX+HNhx7WjuM08AoiSaQ01KGNiPa1OA9M7IxpMPIuwKwAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:3031::ac43:cde7,2606:4700:3036::6815:229a
+     # ECH ist the e)ncrypted c)lient h)ello --> for esni (https://datatracker.ietf.org/doc/draft-ietf-tls-esni/)
+     # Nice descrption: https://www.netmeister.org/blog/https-rrs.html
+
+     # Thus we try first whether we can query the HTTPS records directly as this gives us that already
+     # in clear text and also we can avoid to parse the encoded format. We'll do that as a fallback but
+     # at this moment we're trying to scrape only the values alpn from it, if they come first.
+
+     OPENSSL_CONF=""
+     if "$HAS_DIG_HTTPS"; then
+          text_httpsrr=$(dig +short +search +timeout=3 +tries=3 $noidnout HTTPS "$1" 2>/dev/null)
+     elif "$HAS_DRILL_HTTPS"; then
+          text_httpsrr=$(drill -Q  HTTPS $1 2>/dev/null)
+     elif "$HAS_HOST_HTTPS"; then
+          text_httpsrr=$(host -t HTTPS $1 2>/dev/null)
+          text_httpsrr=${text_httpsrr#*record }
+     elif "$HAS_NSLOOKUP_HTTPS"; then                                            # from 4th field onwards \/
+          text_httpsrr=$(nslookup -type=HTTPS $1 | awk '/'"^${1}"'.*rdata_65// { print substr($0,index($0,$4)) }')
+     fi
+
+     # Now we need to try parsing the raw output
+
+     # If there's a type65 record there are 2x3 output formats, mostly depending on age of distribution
      # -- roughly that's the difference between text and binary format -- and the type of DNS client
 
      # for host:
@@ -21638,54 +21700,88 @@ get_https_rrecord() {
 
      # we normalize the output during the following so that's e.g. 1 . alpn="h2"
 
-     OPENSSL_CONF=""
-     # Read either answer 1) or 2) into raw_https. Should be empty if there's no such record
-     if "$HAS_DIG"; then
-          raw_https="$(dig $DIG_R +short +search +timeout=3 +tries=3 $noidnout type65 "$1" 2>/dev/null)"
-          # empty if there's no such record
-     elif "$HAS_DRILL"; then
-          raw_https="$(drill $1 type65 | grep -v '^;;' | awk '/'"^${1}"'.*HTTPS/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
-          # empty if there's no such record
-     elif "$HAS_HOST"; then
-          raw_https="$(host -t type65 $1)"
-          if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
-               raw_https=""
-          else
-               raw_https="${raw_https/$1 has HTTPS record /}"
-               raw_https="${raw_https/$1 has TYPE65 record /}"
-          fi
-     elif "$HAS_NSLOOKUP"; then
-          raw_https="$(strip_lf "$(nslookup -type=type65 $1 | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
-          # empty if there's no such record
-     else
-          return 1
-          # No dig, drill, host, or nslookup --> complaint was elsewhere already
-     fi
-     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+# https://datatracker.ietf.org/doc/rfc9460/?include_text=1
 
-     if [[ -z "$raw_https" ]]; then
-          return 1
-     elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
-          while read hash len line ;do
-          #           \#  10  00010000010003026832
-#FIXME: the following doesn't really work
-               if [[ "${line:0:2}" == 00 ]]; then                                 # probably the https flag, always 00, so we don't keep this
-                    len_https_property=$(printf "%0d" "$((10#${line:2:2}))")      # get len and do some kind of type casting
-                    len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
-                    line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
-                    https_property_name="$(hex2ascii ${line:4:$len_https_property})"
-                    https_property_value="$(hex2ascii "${line:$((4+len_https_property)):100}")"
-                    # echo "${https}=${https}"
-                    all_https+="${https_property_name}=${https_property_value}\n"
-               else
-                    outln "please report unknown HTTPS RR $line with flag @ $NODE"
-                    return 7
-               fi
-          done <<< "$raw_https"
-          sort <<< "$(safe_echo "$all_https")"
+#set -x
+     if [[ -n "$text_httpsrr" ]]; then
+          safe_echo "$text_httpsrr"
      else
-          safe_echo "$raw_https"
+          if "$HAS_DIG"; then
+               raw_https="$(dig $DIG_R +short +search +timeout=3 +tries=3 $noidnout type65 "$1" 2>/dev/null)"
+               # empty if there's no such record
+          elif "$HAS_DRILL"; then
+               raw_https="$(drill $1 type65 | grep -v '^;;' | awk '/'"^${1}"'.*TYPE65/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
+               # empty if there's no such record
+          elif "$HAS_HOST"; then
+               raw_https="$(host -t type65 $1)"
+               if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
+                    raw_https=""
+               else
+                    raw_https="${raw_https/$1 has HTTPS record /}"
+                    raw_https="${raw_https/$1 has TYPE65 record /}"
+               fi
+          elif "$HAS_NSLOOKUP"; then
+               raw_https="$(strip_lf "$(nslookup -type=type65 $1 | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
+               # empty if there's no such record
+          else
+               return 1
+               # No dig, drill, host, or nslookup --> complaint was elsewhere already
+          fi
+          OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
+
+# Format probably: https://www.rfc-editor.org/rfc/rfc3597 (plus updates)
+
+# dig +short +search +timeout=3 +tries=3 +noidnout type65 dev.testssl.sh
+# 1 . alpn="h2" port=443 ipv6hint=2a01:238:4308:a920:1000:0:b:1337
+#
+# 36 000100000100030268320003000201BB000600102A0102384308A920 10000000000B1337
+#         alpn|   L  h 2           443       2a010238...                               L=len
+
+# dig +short +search +timeout=3 +tries=3 +noidnout HTTPS testssl.net  (split over a couple of lines)
+#
+# 1. alpn="h3,h2" ipv4hint=104.21.34.154,172.67.205.231
+# 136 00010000010006026833026832000400086815229AAC43CDE7000500 470045FE0D0041F3002000202BD0935ED66980C1862F2570C0D6014D
+#          alpn|    L  h 3 L h 2        |IPv4#1||IPv4#2|
+
+# ech=AEX+DQBBzgAgACBQGA9EFbz+PkJAXSXtcqJluxLlhxIgzhJ+GhTtRd4nJQAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:3031::ac43:cde7,2606:4700:3036::6815:229a
+# 733A7CFAAEA5E4DD9CA43D4C24199E330004000100010012636C6F75 64666C6172652D6563682E636F6D0000000600202606470030310000 00000000AC43CDE72606470030360000000000006815229A
+#                                                 | cloudflare-ech.com                |            IPv6#1                           #IPv6#2
+
+          if [[ -z "$raw_https" ]]; then
+               return 1
+          elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
+               while read hash len line ;do
+               #           \#  10  00010000010003026832
+                    if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.1
+                         svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probbaly not needed) type casting. 0 is alias
+                         if [[ ${line:8:2} != 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
+                              continue                                               # If the first element is not alpn, next iteration of loop will fail.
+                         fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
+
+                         xlen_https_property=${line:12:2}                            # length of alpn entries
+                         https_property_value=${line:16:4}
+                         https_property_name=$(hex2ascii $https_property_value)
+                         if [[ $xlen_https_property != 03 ]]; then                   # 06 would be another entry
+                              https_property_value=${line:22:4}                      #FIXME: we can't cope with three entries yet
+                              https_property_name="${https_property_name},$(hex2ascii $https_property_value)"
+                         fi
+                         echo $https_property_name
+
+#                         len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
+#                         line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
+#                         https_property_name="$(hex2ascii ${line:4:$len_https_property})"
+#                         https_property_value="$(hex2ascii "${line:$((4+len_https_property)):100}")"
+                    else
+                         outln "please report unknown HTTPS RR $line with flag @ $NODE"
+                         return 7
+                    fi
+               done <<< "$raw_https"
+          else
+               safe_echo "$raw_https"
+          fi
      fi
+#set +x
+
      return 0
 }
 
@@ -22413,6 +22509,7 @@ determine_optimal_proto() {
 dns_https_rr () {
      local jsonID="DNS_HTTPS_rrecord"
      local https_rr=""
+     local indent=""
 
      out "$indent"; pr_bold " DNS HTTPS RR"; out " (experim.) "
      if [[ -n "$NODNS" ]]; then
@@ -22432,7 +22529,6 @@ dns_https_rr () {
                fileout "${jsonID}" "INFO" " no resource record found"
           fi
      fi
-
 }
 
 
