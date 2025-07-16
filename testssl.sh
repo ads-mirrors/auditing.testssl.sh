@@ -20946,7 +20946,12 @@ find_openssl_binary() {
      initialize_engine
 
      openssl_location="$(type -p $OPENSSL)"
-     
+
+     # kludge for e.g. MacOS and brew
+     if [[ $OPENSSL == $OPENSSL2 ]]; then
+          OPENSSL2=$(type -a openssl | grep -v /usr/bin/openssl | awk '{ print $NF }')
+     fi
+
      [[ -n "$GIT_REL" ]] && \
           cwd="$PWD" || \
           cwd="$RUN_DIR"
