@@ -1939,7 +1939,7 @@ http_head_printf() {
      IFS=/ read -r proto foo node query <<< "$1"
      node=${node%:*}
      # $node works here good as it connects via IPv6 first, then IPv4
-     bash -c "exec 33<>/dev/tcp/$node/80" >/dev/null &
+     bash -c "exec 33<>/dev/tcp/$node/80" 2>/dev/null &
      wait_kill $! $HEADER_MAXSLEEP
      if [[ $? -ne 0 ]]; then
           # not killed --> socket open. Now we connect to the virtual host "$node"
