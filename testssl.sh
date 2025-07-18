@@ -1958,7 +1958,7 @@ http_head_printf() {
                ret=1
           fi
      fi
-          exec 33<&-
+     exec 33<&-
      exec 33>&-
      return $ret
 }
