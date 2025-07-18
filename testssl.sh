@@ -1938,10 +1938,12 @@ http_head_printf() {
 
      IFS=/ read -r proto foo node query <<< "$1"
      node=${node%:*}
-     # $node works here good as it connects via IPv6 first, then IPv4
-     bash -c "exec 33<>/dev/tcp/$node/80" 2>/dev/null &
+     # $node works here good as it connects via IPv6 first, then IPv4.
+     # This is a subshell, so fd 8 is not inherited
+     bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null &
      wait_kill $! $HEADER_MAXSLEEP
-     if [[ $? -ne 0 ]]; then
+     if [[ $? -eq 0 ]]; then
+          exec 33<>/dev/tcp/$node/80
           # not killed --> socket open. Now we connect to the virtual host "$node"
           printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile
           ret=0
