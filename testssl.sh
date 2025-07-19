@@ -17707,16 +17707,22 @@ run_opossum() {
                uri=${URI/https:\/\//}
                response=$(http_head_printf http://${uri} 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
                # In any case we use $response but we handle the return codes
-               case $? in
-                    0)   ret=0 ;;
-                    1|3) ret=7 ;;       # got stuck
-               esac
+               #           0: connection was fine, 1 or 3: no http connection
+               ret=$?
                if [[ $response =~ Upgrade:\ TLS ]]; then
                     prln_svrty_high "VULNERABLE (NOT ok)"
                     fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
-               else
+               elif [[ $ret -eq 0 ]]; then
                     prln_svrty_good "not vulnerable (OK)"
-                    fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
+                    fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
+               else
+                    if [[ $ret -eq 3 ]]; then
+                         prln_local_problem "direct connection to port 80 failed, better try without proxy"
+                         fileout "$jsonID" "WARN" "direct connection to port 80 failed, try w/o no proxy" "$cve" "$cwe"
+                    else
+                         outln "connection to port 80 failed"
+                         fileout "$jsonID" "INFO" "connection to port 80 failed" "$cve" "$cwe"
+                    fi
                fi
           ;;
           IMAP|FTP|POP3|SMTP|LMTP|NNTP)
