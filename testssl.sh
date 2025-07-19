@@ -22333,7 +22333,7 @@ determine_ip_addresses() {
      local ip4=""
      local ip6=""
 
-     # first, try to get IP addresse from /etc/hosts
+     # first, try to get IP addresses from /etc/hosts
      # Local_A[AAA] is for our UI
      ip4=$(get_local_a "$NODE")
      if [[ -n "$ip4" ]]; then
