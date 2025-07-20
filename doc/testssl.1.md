@@ -36,7 +36,7 @@ linked OpenSSL binaries for major operating systems are supplied in `./bin/`.
 
 `testssl.sh URI` as the default invocation does the so-called default run which does a number of checks and puts out the results colorized (ANSI and termcap) on the screen. It does every check listed below except `-E` which are (order of appearance):
 
-0) displays a banner (see below), does a DNS lookup also for further IP addresses and does for the returned IP address a reverse lookup. Last but not least a service check is being done.
+0) displays a banner (see below), does a DNS lookup also for further IP addresses and does for the returned IP address a reverse lookup. Last but not least a service check is being done. 
 
 1) SSL/TLS protocol check
 
@@ -58,6 +58,7 @@ linked OpenSSL binaries for major operating systems are supplied in `./bin/`.
 
 10) rating
 
+If a target FQDN has multiple IPv4 and/or multiple IPv6 addresses, it scans all IPs with the specified options or using the default run - unless specified otherwise, see `--ip`, `-4` and `-6`. IPv6 connectivity is automagically checked. If there's noch such thing you will see a banner *Testing all **IPv4** addresses* and all IPv6 addresses will appear in round brackets.
 
 
 ## OPTIONS AND PARAMETERS
@@ -124,7 +125,7 @@ The same can be achieved by setting the environment variable `WARNINGS`.
 
 `--mx <domain|host>` tests all MX records (STARTTLS on port 25) from high to low priority, one after the other.
 
-`--ip <ip>` tests either the supplied IPv4 or IPv6 address instead of resolving host(s) in `<URI>`. IPv6 addresses need to be supplied in square brackets. `--ip=one` means: just test the first A record DNS returns (useful for multiple IPs). If `-6` and  `--ip=one` was supplied an AAAA record will be picked if available. The ``--ip`` option might be also useful if you want to resolve the supplied hostname to a different IP, similar as if you would edit `/etc/hosts` or `/c/Windows/System32/drivers/etc/hosts`. `--ip=proxy` tries a DNS resolution via proxy. `--ip=proxy` plus `--nodns=min` is useful for situations with no local DNS as there'll be no DNS timeouts when trying to resolve CAA, TXT and MX records.
+`--ip <ip>` tests either the supplied IPv4 or IPv6 address instead of resolving host(s) in `<URI>`. IPv6 addresses need to be supplied in square brackets. `--ip=one` means: just test the first A record DNS returns (useful for multiple IPs). If `-6` and  `--ip=one` was supplied an AAAA record will be picked if available. The `--ip` option might be also useful if you want to resolve the supplied hostname to a different IP, similar as if you would edit `/etc/hosts` or `/c/Windows/System32/drivers/etc/hosts`. `--ip=proxy` tries a DNS resolution via proxy. `--ip=proxy` plus `--nodns=min` is useful for situations with no local DNS as there'll be no DNS timeouts when trying to resolve CAA, TXT and MX records.
 
 `--proxy <host>:<port>`  does ANY check via the specified proxy. `--proxy=auto` inherits the proxy setting from the environment. Any hostname supplied will be resolved to the first A record, if it does not exist the AAAA record is used. IPv4 and IPv6 addresses can be passed too, the latter *also* with square bracket notation. Please note that you need a newer OpenSSL or LibreSSL version for IPv6 proxy functionality. In addition if you want lookups via proxy you can specify `DNS_VIA_PROXY=true`. OCSP revocation checking (`-S --phone-out`) is not supported by OpenSSL via proxy. As supplying a proxy is an indicator for port 80 and 443 outgoing being blocked in your network an OCSP revocation check won't be performed. However if `IGN_OCSP_PROXY=true` has been supplied it will be tried directly. Authentication to the proxy is not supported, also no HTTPS or SOCKS proxy.
 

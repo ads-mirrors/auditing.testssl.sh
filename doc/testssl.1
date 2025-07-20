@@ -92,6 +92,15 @@ testing each of 370 preconfigured ciphers
 client simulation
 .IP "10)" 4
 rating
+.PP
+If a target FQDN has multiple IPv4 and/or multiple IPv6 addresses, it
+scans all IPs with the specified options or using the default run -
+unless specified otherwise, see \f[V]--ip\f[R], \f[V]-4\f[R] and
+\f[V]-6\f[R].
+IPv6 connectivity is automagically checked.
+If there\[cq]s noch such thing you will see a banner \f[I]Testing all
+\f[BI]IPv4\f[I] addresses\f[R] and all IPv6 addresses will appear in
+round brackets.
 .SS OPTIONS AND PARAMETERS
 .PP
 Options are either short or long options.
