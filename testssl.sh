@@ -2221,6 +2221,12 @@ check_revocation_ocsp() {
      fi
 }
 
+# waits maxsleep seconds (arg2) until process with arg1 (pid) will be killed
+#
+# return values
+#         0: process terminated before be killed
+#         3: was killed
+#
 wait_kill(){
      local pid=$1             # pid we wait for or kill
      local maxsleep=$2        # how long we wait before killing
@@ -6208,6 +6214,7 @@ sub_quic() {
      local jsonID="QUIC"
 
      [[ $DEBUG -ne 0 ]] && sclient_errfile=/dev/null
+     [[ "$SERVICE" != HTTP ]] && return 0
 
      pr_bold " QUIC       ";
 
