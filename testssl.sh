@@ -1923,50 +1923,57 @@ http_head() {
 #    arg2: extra http header
 #
 # return codes:
-#    0: all fine
-#    1: server dind't respond within HEADER_MAXSLEEP
-#    3: server dind't respond within HEADER_MAXSLEEP and PROXY was defined
+#    0: all fine (response header is returned as string)
+#    1: server didn't respond within HEADER_MAXSLEEP
+#    3: server didn't respond within HEADER_MAXSLEEP and PROXY was defined
 #
-http_header_printf() {
+http_head_printf() {
      local request_header="$2"
      local useragent="$UA_STD"
-     local tmpfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf.log
-     local errfile=$TEMPDIR/$NODE.$NODEIP.http_header_printf-err.log
+     local tmpfile=$TEMPDIR/$NODE.$NODEIP.http_head_printf.log
+     local errfile=$TEMPDIR/$NODE.$NODEIP.http_head_printf-err.log
      local -i ret=0
      local proto="" foo="" node="" query=""
 
      [[ $DEBUG -eq 0 ]] && errfile=/dev/null
 
      IFS=/ read -r proto foo node query <<< "$1"
-     exec 33<>/dev/tcp/$node/80
-     printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile &
+     node=${node%:*}
+     # $node works here good as it connects via IPv6 first, then IPv4.
+     # This is a subshell, so fd 8 is not inherited
+     bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null &
      wait_kill $! $HEADER_MAXSLEEP
-     if [[ $? -ne 0 ]]; then
-          # not killed
-          if [[ -n "$PROXY" ]]; then
-               ret=3
+     if [[ $? -ne 3 ]]; then
+          # process with pid !$ wasn't killed but was that a reject? So we try again
+          # to make sure there wasn't a TCP reset
+          bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null
+          if [[ $? -eq 0 ]]; then
+               exec 33<>/dev/tcp/$node/80
+               # not killed --> socket open. Now we connect to the virtual host "$node"
+               printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile
+               ret=0
+               if [[ $DEBUG -eq 0 ]] ; then
+                    cat <&33
+               else
+                    cat <&33 >$tmpfile
+                    cat $tmpfile
+               fi
+          else
+               if [[ -n "$PROXY" ]]; then
+                    ret=3
+               else
+                    ret=1
+               fi
           fi
-          ret=1
-     else
-          ret=0
+          exec 33<&-
+          exec 33>&-
      fi
-     if [[ $DEBUG -eq 0 ]] ; then
-          cat <&33
-     else
-          cat <&33 >$tmpfile
-          cat $tmpfile
-     fi
-     exec 33<&-
-     exec 33>&-
      return $ret
 }
 
 
 ldap_get() {
      local ldif
-     local -i success
-     local crl="$1"
-     local tmpfile="$2"
      local jsonID="$3"
 
      if type -p curl &>/dev/null; then
@@ -17704,18 +17711,24 @@ run_opossum() {
      case $service in
           HTTP)
                uri=${URI/https:\/\//}
-               response=$(http_header_printf http://${uri} 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
+               response=$(http_head_printf http://${uri} 'Upgrade: TLS/1.0\r\n\r\nClose\r\n')
                # In any case we use $response but we handle the return codes
-               case $? in
-                    0)   ret=0 ;;
-                    1|3) ret=7 ;;       # got stuck
-               esac
+               #           0: connection was fine, 1 or 3: no http connection
+               ret=$?
                if [[ $response =~ Upgrade:\ TLS ]]; then
                     prln_svrty_high "VULNERABLE (NOT ok)"
                     fileout "$jsonID" "CRITICAL" "VULNERABLE" "$cve" "$cwe" "$hint"
-               else
+               elif [[ $ret -eq 0 ]]; then
                     prln_svrty_good "not vulnerable (OK)"
-                    fileout "$jsonID" "OK" "not vulnerable $append" "$cve" "$cwe"
+                    fileout "$jsonID" "OK" "not vulnerable" "$cve" "$cwe"
+               else
+                    if [[ $ret -eq 3 ]]; then
+                         prln_local_problem "direct connection to port 80 failed, better try without proxy"
+                         fileout "$jsonID" "WARN" "direct connection to port 80 failed, try w/o no proxy" "$cve" "$cwe"
+                    else
+                         outln "connection to port 80 failed"
+                         fileout "$jsonID" "INFO" "connection to port 80 failed" "$cve" "$cwe"
+                    fi
                fi
           ;;
           IMAP|FTP|POP3|SMTP|LMTP|NNTP)
