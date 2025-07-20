@@ -151,7 +151,7 @@ declare -a SKIP_TESTS=()                          # This array hold the checks t
 # Following variables make use of $ENV and can also be used like "<VAR>=<value> ./testssl.sh <URI>"
 declare -x OPENSSL
 OPENSSL_TIMEOUT=${OPENSSL_TIMEOUT:-""}  # Default connect timeout with openssl before we call the server side unreachable
-CONNECT_TIMEOUT=${CONNECT_TIMEOUT:-""}  # Default connect timeout with sockets before we call the server side unreachable
+SOCKET_TIMEOUT=${SOCKET_TIMEOUT:-""}    # Default connect timeout with sockets before we call the server side unreachable
 PHONE_OUT=${PHONE_OUT:-false}           # Whether testssl can retrieve CRLs and OCSP
 FAST_SOCKET=${FAST_SOCKET:-false}       # EXPERIMENTAL feature to accelerate sockets -- DO NOT USE it for production
 COLOR=${COLOR:-2}                       # 3: Extra color (ciphers, curves), 2: Full color, 1: B/W only 0: No ESC at all
@@ -186,7 +186,7 @@ OVERWRITE=${OVERWRITE:-false}           # overwriting csv/json/html/log file
 [[ -z "$NODNS" ]] && declare NODNS      # If unset it does all DNS lookups per default. "min" only for hosts or "none" at all
 NXDNS=${NXDNS:-invalid.}                # For WSL this helps avoiding DNS requests to "invalid." which windows seem to handle delayed
 NXCONNECT=""                            # needed when when need to test capabilities of the openssl binary
-HAS_IPv6=${HAS_IPv6:-false}             # if you have OpenSSL with IPv6 support AND IPv6 networking set it to yes
+IPv6_OK=false                           # Determines later whether there's IPv6 connectivity for the user or not
 ALL_CLIENTS=${ALL_CLIENTS:-false}       # do you want to run all client simulation form all clients supplied by SSLlabs?
 OFFENSIVE=${OFFENSIVE:-true}            # do you want to include offensive vulnerability tests which may cause blocking by an IDS?
 ADDTL_CA_FILES="${ADDTL_CA_FILES:-""}"  # single file with a CA in PEM format or comma separated lists of them
@@ -391,8 +391,8 @@ NODE=""
 NODEIP=""
 rDNS=""
 CORRECT_SPACES=""                       # Used for IPv6 and proper output formatting
-IPADDRs=""
-IP46ADDRs=""
+IPADDRs2CHECK=""                        # Contains all IP addresses to test
+IPADDRs2SHOW=""                         # ... those are the ones to be displayed
 LOCAL_A=false                           # Does the $NODEIP come from /etc/hosts?
 LOCAL_AAAA=false                        # Does the IPv6 IP come from /etc/hosts?
 XMPP_HOST=""
@@ -1339,7 +1339,7 @@ fileout_pretty_json_banner() {
 
      if ! "$do_mass_testing"; then
           [[ -z "$NODE" ]] && parse_hn_port "${URI}"
-          # NODE, URL_PATH, PORT, IPADDR and IP46ADDR is set now  --> wrong place
+          # NODE, URL_PATH, PORT, IPADDR and IPADDRs2SHOW is set now  --> wrong place
           target="$NODE"
           $do_mx_all_ips && target="$URI"
      fi
@@ -1470,7 +1470,7 @@ json_header() {
      elif "$do_mx_all_ips"; then
           fname_prefix="${FNAME_PREFIX}mx-${URI}"
      else
-          # ensure NODE, URL_PATH, PORT, IPADDR and IP46ADDR are set
+          # ensure NODE, URL_PATH, PORT, IPADDR and IPADDRs2SHOW are set
           ! "$filename_provided" && [[ -z "$NODE" ]] && parse_hn_port "${URI}"
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
@@ -1518,7 +1518,7 @@ csv_header() {
      elif "$do_mx_all_ips"; then
           fname_prefix="${FNAME_PREFIX}mx-${URI}"
      else
-          # ensure NODE, URL_PATH, PORT, IPADDR and IP46ADDR are set
+          # ensure NODE, URL_PATH, PORT, IPADDR and IPADDRs2SHOW are set
           ! "$filename_provided" && [[ -z "$NODE" ]] && parse_hn_port "${URI}"
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
@@ -1575,7 +1575,7 @@ html_header() {
      elif "$do_mx_all_ips"; then
           fname_prefix="${FNAME_PREFIX}mx-${URI}"
      else
-          # ensure NODE, URL_PATH, PORT, IPADDR and IP46ADDR are set
+          # ensure NODE, URL_PATH, PORT, IPADDR and IPADDRs2SHOW are set
           ! "$filename_provided" && [[ -z "$NODE" ]] && parse_hn_port "${URI}"
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
@@ -12153,12 +12153,14 @@ fd_socket() {
                     break
                fi
           done
-     # For the following execs: 2>/dev/null would remove a potential error message, but disables debugging.
-     # First we check whether a socket connect timeout was specified. We exec the connect in a subshell,
-     # then we'll see whether we can connect. If not we take the emergency exit. If we're still alive we'll
+     # For the following exec commands: 2>/dev/null would remove a potential error message, but would disable
+     # debugging.
+     # First we check whether a socket timeout was specified. We exec the connect in a subshell,
+     # and see whether. If not we take the emergency exit: fatal() in connectivity_problem.
+     # Otherwise (no socket timeout) OR when we survived that we do that without subshell.
      # proceed with the "usual case", see below.
-     elif [[ -n "$CONNECT_TIMEOUT" ]]; then
-          if ! $TIMEOUT_CMD $CONNECT_TIMEOUT bash -c "exec 5<>/dev/tcp/$nodeip/$PORT"; then
+     elif [[ -n "$SOCKET_TIMEOUT" ]]; then
+          if ! $TIMEOUT_CMD $SOCKET_TIMEOUT bash -c "exec 5<>/dev/tcp/$nodeip/$PORT"; then
                ((NR_SOCKET_FAIL++))
                connectivity_problem $NR_SOCKET_FAIL $MAX_SOCKET_FAIL "TCP connect problem" "repeated TCP connect problems (connect timeout), giving up"
                outln
@@ -21190,7 +21192,7 @@ find_openssl_binary() {
 
      $OPENSSL verify -trusted_first </dev/null 2>&1 | grep -q '^usage' || TRUSTED1ST="-trusted_first"
 
-     if [[ -n "$CONNECT_TIMEOUT" ]] || [[ -n "$OPENSSL_TIMEOUT" ]]; then
+     if [[ -n "$SOCKET_TIMEOUT" ]] || [[ -n "$OPENSSL_TIMEOUT" ]]; then
           # We don't set a general timeout as we might not have "timeout" installed and we only
           # do what is instructed. Thus we check first what the command line params were,
           # then we proceed
@@ -21203,8 +21205,7 @@ find_openssl_binary() {
                fi
           else
                TIMEOUT_CMD=""
-               outln
-               fatal "You specified a connect or openssl timeout but the binary \"timeout\" couldn't be found " $ERR_RESOURCE
+               fatal "You specified a socket or openssl timeout but the binary \"timeout\" couldn't be found " $ERR_RESOURCE
           fi
      fi
 
@@ -21366,7 +21367,7 @@ help() {
                                    Text format 2: nmap output in greppable format (-oG), 1 port per line allowed
      --mode <serial|parallel>      Mass testing to be done serial (default) or parallel (--parallel is shortcut for the latter)
      --warnings <batch|off>        "batch" doesn't continue when a testing error is encountered, off continues and skips warnings
-     --connect-timeout <seconds>   useful to avoid hangers. Max <seconds> to wait for the TCP socket connect to return
+     --socket-timeout <seconds>    useful to avoid hangers. Max <seconds> to wait for the TCP connect to get ACKed
      --openssl-timeout <seconds>   useful to avoid hangers. Max <seconds> to wait before openssl connect will be terminated
 
 single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
@@ -21402,7 +21403,7 @@ single check as <options>  ("$PROG_NAME URI" does everything except -E and -g):
      -F, --freak                   tests for FREAK vulnerability
      -J, --logjam                  tests for LOGJAM vulnerability
      -D, --drown                   tests for DROWN vulnerability
-     -4, --rc4, --appelbaum        which RC4 ciphers are being offered?
+     --rc4, --appelbaum            which RC4 ciphers are being offered?
 
 tuning / connect options (most also can be preset via environment variables):
      -9, --full                    includes tests for implementation bugs and cipher per protocol (could disappear)
@@ -21411,7 +21412,8 @@ tuning / connect options (most also can be preset via environment variables):
      --ssl-native                  use OpenSSL where sockets are normally used. Faster but inaccurate, avoid it if possible
      --openssl <PATH>              use this openssl binary (default: look in \$PATH, \$RUN_DIR of $PROG_NAME)
      --proxy <host:port|auto>      (experimental) proxy connects via <host:port>, auto: values from \$env (\$http(s)_proxy)
-     -6                            also use IPv6. Works only with supporting OpenSSL version and IPv6 connectivity
+     -4                            Scan IPv4 only
+     -6                            Scan IPv6 only. Works only with supporting OpenSSL version and IPv6 connectivity
      --ip <ip>                     a) tests the supplied <ip> v4 or v6 address instead of resolving host(s) in URI
                                    b) "one" means: just test the first DNS returns (useful for multiple IPs)
                                    c) "proxy" means: dns resolution via proxy. Needed when host has no DNS.
@@ -21528,7 +21530,6 @@ OPENSSL2_HAS_CHACHA20: $OPENSSL2_HAS_CHACHA20
 OPENSSL2_HAS_AES128_GCM: $OPENSSL2_HAS_AES128_GCM
 OPENSSL2_HAS_AES256_GCM: $OPENSSL2_HAS_AES256_GCM
 
-HAS_IPv6: $HAS_IPv6
 HAS_SSL2: $HAS_SSL2
 HAS_SSL3: $HAS_SSL3
 HAS_TLS1: $HAS_TLS1
@@ -21610,12 +21611,13 @@ CLIENT_MIN_FS: $CLIENT_MIN_FS
 DAYS2WARN1: $DAYS2WARN1
 DAYS2WARN2: $DAYS2WARN2
 
-HEADER_MAXSLEEP: $HEADER_MAXSLEEP
+IPv6_OK: $IPv6_OK
 MAX_WAITSOCK: $MAX_WAITSOCK
 HEARTBLEED_MAX_WAITSOCK: $HEARTBLEED_MAX_WAITSOCK
 CCS_MAX_WAITSOCK: $CCS_MAX_WAITSOCK
 USLEEP_SND $USLEEP_SND
 USLEEP_REC $USLEEP_REC
+HEADER_MAXSLEEP: $HEADER_MAXSLEEP
 
 SOCAT: $SOCAT
 
@@ -22305,6 +22307,7 @@ get_mx_record() {
 # arg1: domain / hostname. Returned will be the TXT record as a string which can be multilined
 # (one entry per line), for e.g. non-MTA-STS records.
 # Is supposed to be used by MTA STS in the future like get_txt_record _mta-sts.DOMAIN.TLD
+#
 get_txt_record() {
      local record=""
      local saved_openssl_conf="$OPENSSL_CONF"
@@ -22330,27 +22333,75 @@ get_txt_record() {
 }
 
 
+# This is to check whether we have IPv6 connectivity
+# arg1: IPv6 address to check
+#
+#  sets IPv6_OK if it works -- or not
+#
+shouldwedo_ipv6() {
+     local i=0
 
-# set IPADDRs and IP46ADDRs
+     "$do_ipv4_only" && return 0
+     while true; do
+          bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null
+          if [[ $? -eq 0 ]]; then
+               IPv6_OK=true
+               break
+          fi
+          sleep 1
+          ((i++))
+          [[ $i -ge $MAX_SOCKET_FAIL ]] && break
+     done
+     if ! "$IPv6_OK"; then
+          if "$do_ipv6_only"; then
+               connectivity_problem $i $MAX_SOCKET_FAIL "IPv6 connect problem" "repeated IPv6 connect problems when IPv6-only scan requested"
+          else
+               IPv6_OK=false
+          fi
+     fi
+}
+
+
+# set IPADDRs2CHECK and IPADDRs2SHOW
 #
 determine_ip_addresses() {
      local ip4=""
      local ip6=""
 
-     ip4="$(get_a_record "$NODE")"
-     ip6="$(get_aaaa_record "$NODE")"
-     IP46ADDRs=$(newline_to_spaces "$ip4 $ip6")
+     # first, try to get IP addresses from /etc/hosts
+     # Local_A[AAA] is for our UI
+     ip4=$(get_local_a "$NODE")
+     if [[ -n "$ip4" ]]; then
+          LOCAL_A=true
+     else
+          ip4="$(get_a_record "$NODE")"
+     fi
+     ip6=$(get_local_aaaa "$NODE")
+     if [[ -n "$ip6" ]]; then
+          LOCAL_AAAA=true
+     else
+          ip6=$(get_aaaa_record "$NODE")
+     fi
+     IPADDRs2SHOW=$(newline_to_spaces "$ip4 $ip6")
+
+     if [[ -n "$ip6" ]]; then
+          # sets IPv6_OK
+          shouldwedo_ipv6 $(head -1 <<< "$ip6")
+     fi
 
      if [[ -n "$CMDLINE_IP" ]]; then
           # command line has supplied an IP address or "one"
           if [[ "$CMDLINE_IP" == one ]]; then
-               # use first IPv6 or IPv4 address
-               if "$HAS_IPv6" && [[ -n "$ip6" ]]; then
+               # use first IPv6 or IPv4 address when --ip=one
+               if "$do_ipv4_only"; then
+                    CMDLINE_IP="$(head -1 <<< "$ip4")"
+               elif "$do_ipv6_only"; then
                     CMDLINE_IP="$(head -1 <<< "$ip6")"
                else
                     CMDLINE_IP="$(head -1 <<< "$ip4")"
                fi
           fi
+          # otherwise check what was specified with --ip=
           NODEIP="$CMDLINE_IP"
           if is_ipv4addr "$NODEIP"; then
                ip4="$NODEIP"
@@ -22360,49 +22411,42 @@ determine_ip_addresses() {
                fatal "couldn't identify supplied \"CMDLINE_IP\"" $ERR_DNSLOOKUP
           fi
      elif is_ipv4addr "$NODE"; then
-          ip4="$NODE"                        # only an IPv4 address was supplied as an argument, no hostname
+          ip4="$NODE"                        # only a single IPv4 address was supplied as an argument, no hostname
           SNI=""                             # override Server Name Indication as we test the IP only
+     elif is_ipv6addr "$NODE"; then
+          ip6="$NODE"
+          SNI=""
      else
-          ip4=$(get_local_a "$NODE")         # is there a local host entry?
-          if [[ -z "$ip4" ]]; then           # empty: no (LOCAL_A is predefined as false)
-               ip4=$(get_a_record "$NODE")
-          else
-               LOCAL_A=true                  # we have the ip4 from local host entry and need to signal this to testssl
-          fi
-          # same now for ipv6
-          ip6=$(get_local_aaaa "$NODE")
-          if [[ -z "$ip6" ]]; then
-               ip6=$(get_aaaa_record "$NODE")
-          else
-               LOCAL_AAAA=true               # we have a local ipv6 entry and need to signal this to testssl
-          fi
+          :                                  # standard case
      fi
 
-     # IPv6 only address
-     if [[ -z "$ip4" ]]; then
-          if "$HAS_IPv6"; then
-               IPADDRs=$(newline_to_spaces "$ip6")
-               IP46ADDRs="$IPADDRs"          # IP46ADDRs are the ones to display, IPADDRs the ones to test
+     if "$do_ipv4_only"; then
+          if [[ -z "$ip4" ]]; then
+                fatal_cmd_line "No IPv4 addresses available, but IPv4-only scan requested" $ERR_CMDLINE
           fi
+          IPADDRs2CHECK=$(newline_to_spaces "$ip4")
+     elif "$do_ipv6_only"; then
+          if [[ -z "$ip6" ]]; then
+                fatal_cmd_line "No IPv6 addresses available, but IPv6-only scan requested" $ERR_CMDLINE
+          fi
+          if ! "$IPv6_OK"; then
+               fatal_cmd_line "IPv6 address cannot be reached" $ERR_RESOURCE
+          fi
+          IPADDRs2CHECK=$(newline_to_spaces "$ip6")
      else
-          if "$HAS_IPv6" && [[ -n "$ip6" ]]; then
-               if is_ipv6addr "$CMDLINE_IP"; then
-                    IPADDRs=$(newline_to_spaces "$ip6")
-               else
-                    IPADDRs=$(newline_to_spaces "$ip4 $ip6")
-               fi
-          else
-               IPADDRs=$(newline_to_spaces "$ip4")
-          fi
+          for addr in $IPADDRs2SHOW; do
+               is_ipv6addr $addr && ! "$IPv6_OK" && continue
+               [[ -z $IPADDRs2CHECK ]] && IPADDRs2CHECK="${addr}" || IPADDRs2CHECK="${IPADDRs2CHECK} ${addr}"
+          done
      fi
-     if [[ -z "$IPADDRs" ]]; then
-          if [[ -n "$ip6" ]]; then
-               fatal "Only IPv6 address(es) for \"$NODE\" available, maybe add \"-6\" to $0" $ERR_DNSLOOKUP
-          else
-               fatal "No IPv4/IPv6 address(es) for \"$NODE\" available" $ERR_DNSLOOKUP
+     # If scanning IPV6 doesn't work, put the address to show in round brackets to
+     # signal the user / UI that those won't be scanned. We don't do that for IPv4, yet
+     for addr in $IPADDRs2SHOW; do
+          if is_ipv6addr $addr && ! "$IPv6_OK" ; then
+               IPADDRs2SHOW=${IPADDRs2SHOW/$addr/($addr)}
           fi
-     fi
-     return 0                                # IPADDR and IP46ADDR is set now
+     done
+     return 0
 }
 
 determine_rdns() {
@@ -22411,7 +22455,7 @@ determine_rdns() {
 
      [[ "$NODNS" == none ]] && rDNS="(instructed to skip DNS queries)" && return 0        # No DNS lookups at all
      [[ "$NODNS" == min ]] && rDNS="(instructed to minimize DNS queries)" && return 0     # PTR records were not asked for
-     local nodeip="$(tr -d '[]' <<< $NODEIP)"               # for DNS we do not need the square brackets of IPv6 addresses
+     nodeip="$(tr -d '[]' <<< $NODEIP)"                     # for DNS we do not need the square brackets of IPv6 addresses
      OPENSSL_CONF=""                                        # see https://github.com/testssl/testssl.sh/issues/134
      if [[ "$NODE" == *.local ]]; then
           if "$HAS_DSCACHEUTIL"; then
@@ -23001,7 +23045,7 @@ determine_optimal_proto() {
           fi
      elif "$all_failed"; then
           outln
-          if "$HAS_IPv6"; then
+          if "$IPv6_OK"; then
                pr_bold " Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT "
                fileout "$jsonID" "WARN" "Your $OPENSSL is not IPv6 aware, or $NODEIP:$PORT doesn't seem to be a TLS/SSL enabled server."
           else
@@ -23231,10 +23275,10 @@ display_rdns_etc() {
           out " Via Proxy:              $CORRECT_SPACES"
           outln "$PROXYIP:$PROXYPORT "
      fi
-     if [[ $(count_words "$IP46ADDRs") -gt 1 ]]; then
+     if [[ $(count_words "$IPADDRs2SHOW") -gt 1 ]]; then
           out " Further IP addresses:   $CORRECT_SPACES"
-          for ip in $IP46ADDRs; do
-               if [[ "$ip" == "$NODEIP" ]] || [[ "[$ip]" == "$NODEIP" ]]; then
+          for ip in $IPADDRs2SHOW; do
+               if [[ "$ip" == $NODEIP ]] || [[ "[$ip]" == $NODEIP ]]; then
                     continue
                else
                     further_ip_addrs+="$ip "
@@ -23317,28 +23361,27 @@ run_mx_all_ips() {
                pr_bold "Testing $word MX record (on port $mxport): "
           fi
           outln "$mxs"
-          [[ $mxport == 465 ]] &&  STARTTLS_PROTOCOL=""          # no starttls for tcp 465, all other ports are starttls
+          [[ $mxport == 465 ]] &&  STARTTLS_PROTOCOL=""               # no starttls for tcp 465, all other ports are starttls
           for mx in $mxs; do
                draw_line "-" $((TERM_WIDTH * 2 / 3))
                outln
                parse_hn_port "$mx:$mxport"
                determine_ip_addresses || continue
-               if [[ $(count_words "$IPADDRs") -gt 1 ]]; then    # we have more than one ipv4 address to check
+               if [[ $(count_words "$IPADDRs2CHECK") -gt 1 ]]; then   # we have more than one ipv4 address to check
                     MULTIPLE_CHECKS=true
-                    if [[ "$HAS_IPv6" ]]; then
-                    pr_bold "Testing all IP addresses (port $PORT): "
-               else
+               fi
+               if "$do_ipv4_only"; then
                     pr_bold "Testing all IPv4 addresses (port $PORT): "
-               fi
-               outln "$IPADDRs"
-                    for ip in $IPADDRs; do
-                         NODEIP="$ip"
-                         lets_roll "${STARTTLS_PROTOCOL}"
-                    done
+               elif "$do_ipv6_only"; then
+                    pr_bold "Testing all IPv6 addresses (port $PORT): "
                else
-                    NODEIP="$IPADDRs"
-                    lets_roll "${STARTTLS_PROTOCOL}"
+                    pr_bold "Testing all IP addresses (port $PORT): "
                fi
+               outln "$IPADDRs2CHECK"
+               for ip in $IPADDRs2CHECK; do
+                    NODEIP="$ip"
+                    lets_roll "${STARTTLS_PROTOCOL}"
+               done
                ret=$(($? + ret))
           done
           draw_line "-" $((TERM_WIDTH * 2 / 3))
@@ -24166,6 +24209,9 @@ initialize_globals() {
      do_display_only=false
      do_starttls=false
      do_rating=false
+
+     do_ipv6_only=false
+     do_ipv4_only=false
 }
 
 
@@ -24200,12 +24246,16 @@ set_scanning_defaults() {
      do_server_preference=true
      do_tls_fallback_scsv=true
      do_client_simulation=true
+
      if "$OFFENSIVE"; then
           VULN_COUNT=18
      else
           VULN_COUNT=14
      fi
      do_rating=true
+
+     do_ipv6_only=false
+     do_ipv4_only=false
 }
 
 # returns number of $do variables set = number of run_funcs() to perform
@@ -24529,7 +24579,7 @@ parse_cmd_line() {
                     do_winshock=true
                     ((VULN_COUNT++))
                     ;;
-               -4|--rc4|--appelbaum)
+               --rc4|--appelbaum)
                     do_rc4=true
                     ((VULN_COUNT++))
                     ;;
@@ -24855,8 +24905,8 @@ parse_cmd_line() {
                     MTLS="$(parse_opt_equal_sign "$1" "$2")"
                     [[ $? -eq 0 ]] && shift
                     ;;
-               --connect-timeout|--connect-timeout=*)
-                    CONNECT_TIMEOUT="$(parse_opt_equal_sign "$1" "$2")"
+               --socket-timeout|--socket-timeout=*--connect-timeout|--connect-timeout=*)
+                    SOCKET_TIMEOUT="$(parse_opt_equal_sign "$1" "$2")"
                     [[ $? -eq 0 ]] && shift
                     ;;
                --mapping|--mapping=*)
@@ -24878,8 +24928,9 @@ parse_cmd_line() {
                --phone-out)
                     PHONE_OUT=true
                     ;;
-               -6)  # doesn't work automagically. My versions have -DOPENSSL_USE_IPV6, CentOS/RHEL/FC do not
-                    HAS_IPv6=true
+               -4) do_ipv4_only=true
+                    ;;
+               -6) do_ipv6_only=true
                     ;;
                --has[-_]dhbits|--has[_-]dh[-_]bits)
                     # Should work automagically. Helper switch for CentOS,RHEL+FC w openssl server temp key backport (version 1.0.1), see #190
@@ -24954,6 +25005,8 @@ parse_cmd_line() {
           ((VULN_COUNT++))
      fi
 
+     "$do_ipv4_only" && "$do_ipv6_only" && fatal_cmd_line "-4 and -6 exclude each other" $ERR_CMDLINE
+
      count_do_variables
      [[ $? -eq 0 ]] && set_scanning_defaults
      set_skip_tests
@@ -24970,6 +25023,7 @@ parse_cmd_line() {
 
 
 # connect call from openssl needs ipv6 in square brackets
+#
 nodeip_to_proper_ip6() {
      local len_nodeip=0
 
@@ -25035,6 +25089,7 @@ stopwatch() {
 
 
 # arg1(optional): "init" --> just initializing. Or: STARTTLS protocol
+#
 lets_roll() {
      local -i ret=0
      local section_number=0
@@ -25248,7 +25303,7 @@ lets_roll() {
           exit $?
      fi
 
-     [[ -z "$NODE" ]] && parse_hn_port "${URI}"        # NODE, URL_PATH, PORT, IPADDRs and IP46ADDR is set now
+     [[ -z "$NODE" ]] && parse_hn_port "${URI}"        # NODE, URL_PATH, PORT, IPADDRs2CHECK and IPADDRs2SHOW is set now
      prepare_logging
 
      if [[ -n "$PROXY" ]] && $DNS_VIA_PROXY; then
@@ -25257,29 +25312,27 @@ lets_roll() {
           RET=$?
      else
           determine_ip_addresses
-          if [[ $(count_words "$IPADDRs") -gt 1 ]]; then    # we have more than one ipv4 address to check
+          if [[ $(count_words "$IPADDRs2CHECK") -gt 1 ]]; then
                MULTIPLE_CHECKS=true
-               if [[ "$HAS_IPv6" ]]; then
-                    pr_bold "Testing all IP addresses (port $PORT): "
-               else
-                    pr_bold "Testing all IPv4 addresses (port $PORT): "
-               fi
-               outln "$IPADDRs"
-               for ip in $IPADDRs; do
-                    draw_line "-" $((TERM_WIDTH * 2 / 3))
-                    outln
-                    NODEIP="$ip"
-                    lets_roll "${STARTTLS_PROTOCOL}"
-                    RET=$((RET + $?))                       # RET value per IP address
-               done
+          fi
+          if "$do_ipv4_only"; then
+               pr_bold "Testing all IPv4 addresses (port $PORT): "
+          elif "$do_ipv6_only"; then
+               pr_bold "Testing all IPv6 addresses (port $PORT): "
+          else
+               pr_bold "Testing all IP addresses (port $PORT): "
+          fi
+          outln "$IPADDRs2CHECK"
+          for ip in $IPADDRs2CHECK; do
                draw_line "-" $((TERM_WIDTH * 2 / 3))
                outln
-               pr_bold "Done testing now all IP addresses (on port $PORT): "; outln "$IPADDRs"
-          else                                              # Just 1x ip4v to check, applies also if CMDLINE_IP was supplied
-               NODEIP="$IPADDRs"
+               NODEIP="$ip"
                lets_roll "${STARTTLS_PROTOCOL}"
-               RET=$?
-          fi
+               RET=$((RET + $?))                       # RET value per IP address
+          done
+          draw_line "-" $((TERM_WIDTH * 2 / 3))
+          outln
+          pr_bold "Done testing now all IP addresses (on port $PORT): "; outln "$IPADDRs2CHECK"
      fi
 
 exit $RET
