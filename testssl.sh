@@ -1942,26 +1942,31 @@ http_head_printf() {
      # This is a subshell, so fd 8 is not inherited
      bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null &
      wait_kill $! $HEADER_MAXSLEEP
-     if [[ $? -eq 0 ]]; then
-          exec 33<>/dev/tcp/$node/80
-          # not killed --> socket open. Now we connect to the virtual host "$node"
-          printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile
-          ret=0
-          if [[ $DEBUG -eq 0 ]] ; then
-               cat <&33
+     if [[ $? -ne 3 ]]; then
+          # process with pid !$ wasn't killed but was that a reject? So we try again
+          # to make sure there wasn't a TCP reset
+          bash -c "exec 8<>/dev/tcp/$node/80" 2>/dev/null
+          if [[ $? -eq 0 ]]; then
+               exec 33<>/dev/tcp/$node/80
+               # not killed --> socket open. Now we connect to the virtual host "$node"
+               printf -- "%b" "HEAD ${proto}//${node}/${query} HTTP/1.1\r\nUser-Agent: ${useragent}\r\nHost: ${node}\r\n${request_header}\r\nAccept: */*\r\n\r\n\r\n" >&33 2>$errfile
+               ret=0
+               if [[ $DEBUG -eq 0 ]] ; then
+                    cat <&33
+               else
+                    cat <&33 >$tmpfile
+                    cat $tmpfile
+               fi
           else
-               cat <&33 >$tmpfile
-               cat $tmpfile
+               if [[ -n "$PROXY" ]]; then
+                    ret=3
+               else
+                    ret=1
+               fi
           fi
-     else
-          if [[ -n "$PROXY" ]]; then
-               ret=3
-          else
-               ret=1
-          fi
+          exec 33<&-
+          exec 33>&-
      fi
-     exec 33<&-
-     exec 33>&-
      return $ret
 }
 
