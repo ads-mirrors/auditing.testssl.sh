@@ -22305,7 +22305,6 @@ shouldwedo_ipv6() {
      local i=0
 
      "$do_ipv4_only" && return 0
-
      while true; do
           bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null
           if [[ $? -eq 0 ]]; then
@@ -22316,7 +22315,6 @@ shouldwedo_ipv6() {
           ((i++))
           [[ $i -ge $MAX_SOCKET_FAIL ]] && break
      done
-
      if ! "$IPv6_OK"; then
           if "$do_ipv6_only"; then
                connectivity_problem $i $MAX_SOCKET_FAIL "IPv6 connect problem" "repeated IPv6 connect problems when IPv6-only scan requested"
@@ -22404,7 +22402,13 @@ determine_ip_addresses() {
                [[ -z $IPADDRs2CHECK ]] && IPADDRs2CHECK="${addr}" || IPADDRs2CHECK="${IPADDRs2CHECK} ${addr}"
           done
      fi
-
+     # If scanning IPV6 doesn't work, put the address to show in round brackets to
+     # signal the user / UI that those won't be scanned. We don't do that for IPv4, yet
+     for addr in $IPADDRs2SHOW; do
+          if is_ipv6addr $addr && ! "$IPv6_OK" ; then
+               IPADDRs2SHOW=${IPADDRs2SHOW/$addr/($addr)}
+          fi
+     done
      return 0
 }
 
@@ -23324,22 +23328,19 @@ run_mx_all_ips() {
                determine_ip_addresses || continue
                if [[ $(count_words "$IPADDRs2CHECK") -gt 1 ]]; then   # we have more than one ipv4 address to check
                     MULTIPLE_CHECKS=true
-                    if [[ "$do_ipv4_only" ]]; then
-                         pr_bold "Testing all IPv4 addresses (port $PORT): "
-                    elif [[ "$do_ipv6_only" ]]; then
-                         pr_bold "Testing all IPv6 addresses (port $PORT): "
-                    else
-                         pr_bold "Testing all IP addresses (port $PORT): "
-                    fi
-                    outln "$IPADDRs2CHECK"
-                    for ip in $IPADDRs2CHECK; do
-                         NODEIP="$ip"
-                         lets_roll "${STARTTLS_PROTOCOL}"
-                    done
+               fi
+               if "$do_ipv4_only"; then
+                    pr_bold "Testing all IPv4 addresses (port $PORT): "
+               elif "$do_ipv6_only"; then
+                    pr_bold "Testing all IPv6 addresses (port $PORT): "
                else
+                    pr_bold "Testing all IP addresses (port $PORT): "
+               fi
+               outln "$IPADDRs2CHECK"
+               for ip in $IPADDRs2CHECK; do
                     NODEIP="$ip"
                     lets_roll "${STARTTLS_PROTOCOL}"
-               fi
+               done
                ret=$(($? + ret))
           done
           draw_line "-" $((TERM_WIDTH * 2 / 3))
@@ -25270,31 +25271,27 @@ lets_roll() {
           RET=$?
      else
           determine_ip_addresses
-          if [[ $(count_words "$IPADDRs2CHECK") -gt 1 ]]; then    # we have more than one ipv4 address to check
+          if [[ $(count_words "$IPADDRs2CHECK") -gt 1 ]]; then
                MULTIPLE_CHECKS=true
-               if [[ "$do_ipv4_only" ]]; then
-                    pr_bold "Testing all IPv4 addresses (port $PORT): "
-               elif [[ "$do_ipv6_only" ]]; then
-                    pr_bold "Testing all IPv6 addresses (port $PORT): "
-               else
-                    pr_bold "Testing all IP addresses (port $PORT): "
-               fi
-               outln "$IPADDRs2CHECK"
-               for ip in $IPADDRs2CHECK; do
-                    draw_line "-" $((TERM_WIDTH * 2 / 3))
-                    outln
-                    NODEIP="$ip"
-                    lets_roll "${STARTTLS_PROTOCOL}"
-                    RET=$((RET + $?))                       # RET value per IP address
-               done
+          fi
+          if "$do_ipv4_only"; then
+               pr_bold "Testing all IPv4 addresses (port $PORT): "
+          elif "$do_ipv6_only"; then
+               pr_bold "Testing all IPv6 addresses (port $PORT): "
+          else
+               pr_bold "Testing all IP addresses (port $PORT): "
+          fi
+          outln "$IPADDRs2CHECK"
+          for ip in $IPADDRs2CHECK; do
                draw_line "-" $((TERM_WIDTH * 2 / 3))
                outln
-               pr_bold "Done testing now all IP addresses (on port $PORT): "; outln "$IPADDRs2CHECK"
-          else                                              # Just 1x ip4v to check, applies also if CMDLINE_IP was supplied
-               NODEIP="$IPADDRs2CHECK"
+               NODEIP="$ip"
                lets_roll "${STARTTLS_PROTOCOL}"
-               RET=$?
-          fi
+               RET=$((RET + $?))                       # RET value per IP address
+          done
+          draw_line "-" $((TERM_WIDTH * 2 / 3))
+          outln
+          pr_bold "Done testing now all IP addresses (on port $PORT): "; outln "$IPADDRs2CHECK"
      fi
 
 exit $RET
