@@ -5076,7 +5076,7 @@ client_simulation_sockets() {
           fi
 
           debugme echo -n "requesting more server hello data... "
-          socksend "" $USLEEP_SND
+          socksend_x "" $USLEEP_SND
           sockread 32768
 
           next_packet=$(hexdump -v -e '16/1 "%02X"' "$SOCK_REPLY_FILE")
@@ -11958,7 +11958,7 @@ starttls_postgres_dialog() {
      local starttls_init=", x00, x00 ,x00 ,x08 ,x04 ,xD2 ,x16 ,x2F"
 
      debugme echo "=== starting postgres STARTTLS dialog ==="
-     socksend "${starttls_init}" 0                          && debugme echo "${debugpad}initiated STARTTLS" &&
+     socksend_x "${starttls_init}" 0                          && debugme echo "${debugpad}initiated STARTTLS" &&
      starttls_io "" S 1                                     && debugme echo "${debugpad}received ack (=\"S\") for STARTTLS"
      ret=$?
      debugme echo "=== finished postgres STARTTLS dialog with ${ret} ==="
@@ -11982,7 +11982,7 @@ starttls_ldap_dialog() {
      x31, x2e, x34, x2e, x31, x2e, x31, x34, x36, x36, x2e, x32, x30, x30, x33, x37" # OID for STATRTTLS = "1.3.6.1.4.1.1466.20037"
 
      debugme echo "=== starting LDAP STARTTLS dialog ==="
-     socksend "${starttls_init}"   0    && debugme echo "${debugpad}initiated STARTTLS" &&
+     socksend_x "${starttls_init}"   0    && debugme echo "${debugpad}initiated STARTTLS" &&
      buffer=$(sockread_fast 256)
      [[ $DEBUG -ge 4 ]] && safe_echo "$debugpad $buffer\n"
 
@@ -12051,7 +12051,7 @@ starttls_mysql_dialog() {
      x00, x00, x00, x00, x00, x00, x00"
 
      debugme echo "=== starting mysql STARTTLS dialog ==="
-     socksend "${starttls_init}"   0    && debugme echo "${debugpad}initiated STARTTLS" &&
+     socksend_x "${starttls_init}"   0    && debugme echo "${debugpad}initiated STARTTLS" &&
      starttls_just_read            1    "read succeeded"
      # 1 is the timeout value which only MySQL needs. Note, there seems no response whether STARTTLS
      # succeeded. We could try harder, see https://github.com/openssl/openssl/blob/master/apps/s_client.c
@@ -12076,8 +12076,8 @@ starttls_telnet_dialog() {
      "
 
      debugme echo "=== starting telnet STARTTLS dialog ==="
-     socksend "${msg1}"            0    && debugme echo "${debugpad}initiated STARTTLS" &&
-     socksend "${msg2}"            1    &&
+     socksend_x "${msg1}"            0    && debugme echo "${debugpad}initiated STARTTLS" &&
+     socksend_x "${msg2}"            1    &&
      tnres=$(sockread_fast 20)          && debugme echo "read succeeded"
      [[ $DEBUG -ge 6 ]] && safe_echo "$debugpad $tnres\n"
      # check for START_TLS and FOLLOWS
@@ -12249,20 +12249,34 @@ send_close_notify() {
 
      debugme echo "sending close_notify..."
      if [[ $detected_tlsversion == 0300 ]]; then
-          socksend ",x15, x03, x00, x00, x02, x02, x00" 0
+          socksend_x ",x15, x03, x00, x00, x02, x02, x00" 0
      else
-          socksend ",x15, x03, x01, x00, x02, x02, x00" 0
+          socksend_x ",x15, x03, x01, x00, x02, x02, x00" 0
      fi
 }
 
-# Format string properly for socket
-# ARG1: any commented sequence of two bytes hex, separated by commas. It can contain comments, new lines, tabs and white spaces
+# Format passed multiline string properly for socket
+#    ARG1: any commented multiline sequence of two bytes hex, separated by commas.
+#          It can contain comments, new lines, tabs (shouldn't be there), blanks
+#
 # NW_STR holds the global with the string prepared for printf, like '\x16\x03\x03\'
+#
 code2network() {
-     NW_STR=$(sed -e 's/,/\\\x/g' <<< "$1" | sed -e 's/# .*$//g' -e 's/ //g' -e '/^$/d' | tr -d '\n' | tr -d '\t')
+     NW_STR="${1//$'\t'/}"
+     NW_STR=$(sed -e 's/,/\\\x/g' -e 's/# .*$//g' -e 's/ //g' -e '/^$/d' <<< "${NW_STR}")
+     NW_STR="${NW_STR//$'\n'/}"
 }
 
+
 # sockets inspired by https://blog.chris007.de/using-bash-for-network-socket-operation/
+# Now there are two functions which converts sequence of multiline bytes and send it to the opened
+# bash sockets:
+#    socksend_clienthello():  uses just blocks of bytes separated by commas
+#    socksend_x():            uses just blocks of bytes separated by commas with leading x
+#
+# at some point of time this should be cleaned up
+
+
 # ARG1: hexbytes separated by commas, with a leading comma
 # ARG2: seconds to sleep
 #
@@ -12281,11 +12295,10 @@ socksend_clienthello() {
      sleep $USLEEP_SND
 }
 
-
-# ARG1: hexbytes -- preceded by x -- separated by commas, with a leading comma
+# ARG1: hexbytes with leading x (thus the name) separated by commas, with a leading comma.
 # ARG2: seconds to sleep
 #
-socksend() {
+socksend_x() {
      local data line
 
      # read line per line and strip comments (bash internal func can't handle multiline statements
@@ -15968,7 +15981,7 @@ sslv2_sockets() {
                     mv "$SOCK_REPLY_FILE" "$sock_reply_file2"
 
                     debugme echo -n "requesting more server hello data... "
-                    socksend "" $USLEEP_SND
+                    socksend_x "" $USLEEP_SND
                     sockread 32768
 
                     [[ ! -s "$SOCK_REPLY_FILE" ]] && break
@@ -16684,7 +16697,7 @@ resend_if_hello_retry_request() {
      if [[ "$server_version" == 0304 ]] || [[ 0x$server_version -ge 0x7f16 ]]; then
           # Send a dummy change cipher spec for middlebox compatibility.
           debugme echo -en "\nsending dummy change cipher spec... "
-          socksend ", x14, x03, x03 ,x00, x01, x01" 0
+          socksend_x ", x14, x03, x03 ,x00, x01, x01" 0
      fi
      debugme echo -en "\nsending second client hello... "
      second_clienthello="$(modify_clienthello "$original_clienthello" "$new_key_share" "$cookie")"
@@ -16793,7 +16806,7 @@ tls_sockets() {
                     fi
 
                     debugme echo -n "requesting more server hello data... "
-                    socksend "" $USLEEP_SND
+                    socksend_x "" $USLEEP_SND
                     sockread 32768
 
                     next_packet=$(hexdump -v -e '16/1 "%02X"' "$SOCK_REPLY_FILE")
@@ -17023,7 +17036,7 @@ send_app_data() {
      for (( i=0; i < len; i+=2 )); do
           data+=",x${res:i:2}"
      done
-     socksend "$data" $USLEEP_SND
+     socksend_x "$data" $USLEEP_SND
 }
 
 # Receive application data from a TLS 1.3 channel that has already been created.
@@ -17148,7 +17161,7 @@ run_heartbleed(){
      tls_sockets "${tls_hexcode:6:2}" "" "ephemeralkey" "" "" "false"
 
      [[ $DEBUG -ge 4 ]] && tmln_out "\nsending payload with TLS version $tls_hexcode:"
-     socksend "$heartbleed_payload" 1
+     socksend_x "$heartbleed_payload" 1
      sockread 16384 $HEARTBLEED_MAX_WAITSOCK
      if [[ $? -eq 3 ]]; then
           append=", timed out"
@@ -17283,7 +17296,7 @@ run_ccs_injection(){
 
 # we now make a standard handshake ...
      debugme echo -n "sending client hello... "
-     socksend "$client_hello" 1
+     socksend_x "$client_hello" 1
 
      debugme echo "reading server hello... "
      sockread 32768
@@ -17294,7 +17307,7 @@ run_ccs_injection(){
      fi
      rm "$SOCK_REPLY_FILE"
 # ... and then send the change cipher spec message
-     socksend "$ccs_message" 1 || ok_ids
+     socksend_x "$ccs_message" 1 || ok_ids
      sockread 4096 $CCS_MAX_WAITSOCK
      if [[ $DEBUG -ge 3 ]]; then
           tmln_out "\n1st reply: "
@@ -17304,7 +17317,7 @@ run_ccs_injection(){
      fi
      rm "$SOCK_REPLY_FILE"
 
-     socksend "$ccs_message" 2 || ok_ids
+     socksend_x "$ccs_message" 2 || ok_ids
      sockread 4096 $CCS_MAX_WAITSOCK
      retval=$?
 
@@ -17584,7 +17597,7 @@ run_ticketbleed() {
      for i in 1 2 3; do
           fd_socket 5 || return 6
           debugme echo -n "sending client hello... "
-          socksend "$client_hello" 0
+          socksend_x "$client_hello" 0
 
           debugme echo "reading server hello (ticketbleed reply)... "
           if "$FAST_SOCKET"; then
@@ -20625,9 +20638,9 @@ run_robot() {
                     hexdump -v -e '16/1 "%02x"')"
                if [[ -z "$encrypted_pms" ]]; then
                     if [[ "$DETECTED_TLS_VERSION" == "0300" ]]; then
-                         socksend ",x15, x03, x00, x00, x02, x02, x00" 0
+                         socksend_x ",x15, x03, x00, x00, x02, x02, x00" 0
                     else
-                         socksend ",x15, x03, x01, x00, x02, x02, x00" 0
+                         socksend_x ",x15, x03, x01, x00, x02, x02, x00" 0
                     fi
                     close_socket 5
                     prln_fixme "Conversion of public key failed around line $((LINENO - 9))"
@@ -20658,10 +20671,10 @@ run_robot() {
 
                if "$send_ccs_finished"; then
                     debugme echo -en "\nsending client key exchange, change cipher spec, finished... "
-                    socksend "$client_key_exchange$change_cipher_spec$finished" $USLEEP_SND
+                    socksend_x "$client_key_exchange$change_cipher_spec$finished" $USLEEP_SND
                else
                     debugme echo -en "\nsending client key exchange... "
-                    socksend "$client_key_exchange" $USLEEP_SND
+                    socksend_x "$client_key_exchange" $USLEEP_SND
                fi
                debugme echo "reading server error response..."
                start_time=$(LC_ALL=C date "+%s")
