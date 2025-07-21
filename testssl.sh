@@ -22419,6 +22419,7 @@ determine_ip_addresses() {
      else
           :                                  # standard case
      fi
+     IPADDRs2SHOW=$(newline_to_spaces "$ip4 $ip6")
 
      if "$do_ipv4_only"; then
           if [[ -z "$ip4" ]]; then
@@ -22434,6 +22435,7 @@ determine_ip_addresses() {
           fi
           IPADDRs2CHECK=$(newline_to_spaces "$ip6")
      else
+          # Here we populate for general cases $IPADDRs2CHECK
           for addr in $IPADDRs2SHOW; do
                is_ipv6addr $addr && ! "$IPv6_OK" && continue
                [[ -z $IPADDRs2CHECK ]] && IPADDRs2CHECK="${addr}" || IPADDRs2CHECK="${IPADDRs2CHECK} ${addr}"
