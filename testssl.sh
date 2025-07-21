@@ -17735,8 +17735,10 @@ run_opossum() {
                          prln_local_problem "direct connection to port 80 failed, better try without proxy"
                          fileout "$jsonID" "WARN" "direct connection to port 80 failed, try w/o no proxy" "$cve" "$cwe"
                     else
-                         outln "connection to port 80 failed"
-                         fileout "$jsonID" "INFO" "connection to port 80 failed" "$cve" "$cwe"
+                         out "likely "
+                         pr_svrty_good "not vulnerable (OK)"
+                         outln ", connection to port 80 failed"
+                         fileout "$jsonID" "OK" "connection to port 80 failed" "$cve" "$cwe"
                     fi
                fi
           ;;
