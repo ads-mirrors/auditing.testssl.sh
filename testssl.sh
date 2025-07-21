@@ -270,6 +270,8 @@ PARENT_CSVFILE=""                       # csvfile if mass testing and all output
 PARENT_HTMLFILE=""                      # HTML if mass testing and all output sent to a single file
 TIMEOUT_CMD=""
 HAD_SLEPT=0
+SWK_SECs=0.1                            # Tuning var SLEEP_WAITKILL in secs. Better don't touch it. SWK_SECs * SWK_FACTOR needs to ne equal 1
+SWK_FACTOR=10                           # Tuning var SLEEP_WAITKILL FACTOR in secs. Better don't touch it.
 NR_SOCKET_FAIL=0                        # Counter for socket failures
 NR_OSSL_FAIL=0                          # .. for OpenSSL connects
 NR_STARTTLS_FAIL=0                      # .. for STARTTLS failures
@@ -2228,30 +2230,33 @@ check_revocation_ocsp() {
      fi
 }
 
-# waits maxsleep seconds (arg2) until process with arg1 (pid) will be killed
+
+# waits maxsleep fractions of seconds (arg2) until process with arg1 (pid) will be killed
 #
 # return values
 #         0: process terminated before be killed
 #         3: was killed
 #
 wait_kill(){
-     local pid=$1             # pid we wait for or kill
-     local maxsleep=$2        # how long we wait before killing
+     local pid=$1                  # pid we wait for or kill
+     local maxsleep=$2             # how long we wait before killing
 
+     maxsleep=$((maxsleep*SWK_FACTOR))
      HAD_SLEPT=0
      while true; do
           if ! ps $pid >/dev/null ; then
-               return 0       # process terminated before didn't reach $maxsleep
+               return 0            # process terminated before didn't reach $maxsleep
           fi
           [[ "$DEBUG" -ge 6 ]] && ps $pid
-          sleep 1
+          sleep $SWK_SECs
           maxsleep=$((maxsleep - 1))
+#FIXME: HAD_SLEPT currently assumes we slep one second but only used by run_http_header()
           HAD_SLEPT=$((HAD_SLEPT + 1))
           test $maxsleep -le 0 && break
-     done                     # needs to be killed:
+     done                          # needs to be killed:
      kill $pid >&2 2>/dev/null
-     wait $pid 2>/dev/null    # make sure pid terminated, see wait(1p)
-     return 3                 # means killed
+     wait $pid 2>/dev/null         # make sure pid terminated, see wait(1p)
+     return 3                      # means killed
 }
 
 # Convert date formats -- we always use GMT=UTC here
@@ -2582,6 +2587,7 @@ sanitze_http_header() {
 
 
 #problems not handled: chunked
+#
 run_http_header() {
      local header
      local referer useragent
