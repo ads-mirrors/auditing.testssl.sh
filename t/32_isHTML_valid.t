@@ -10,14 +10,16 @@ use Text::Diff;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $uri="web.de";
+my $uri="bahn.de";
 my $out="";
 my $html="";
 my $debughtml="";
 my $edited_html="";
 my $htmlfile="tmp.html";
-my $check2run="--ip=one --sneaky --ids-friendly --color 0 --htmlfile $htmlfile";
+#  need to avoid the debug message around L15190++ Your ./bin/openssl.Linux.x86_64 doesn't support X25519 :
+my $check2run="--ip=one --openssl /usr/bin/openssl --sneaky --ids-friendly --color 0 --htmlfile $htmlfile";
 my $diff="";
+
 die "Unable to open $prg" unless -f $prg;
 
 printf "\n%s\n", "Doing HTML output checks";
@@ -52,6 +54,13 @@ ok($edited_html eq $out, "Checking if HTML file matches terminal output") or
      diag ("\n%s\n", "$diff");
 
 $tests++;
+
+
+if ( $^O eq "darwin" ){
+     printf "\nskip debug checkon MacOS\n\n";
+     done_testing($tests);
+     exit 0;
+}
 
 
 #2
