@@ -877,12 +877,18 @@ strip_spaces() {
      echo "${1// /}"
 }
 
-# https://web.archive.org/web/20121022051228/http://codesnippets.joyent.com/posts/show/1816
 strip_leading_space() {
+     # https://web.archive.org/web/20121022051228/http://codesnippets.joyent.com/posts/show/1816
      printf "%s" "${1#"${1%%[![:space:]]*}"}"
 }
+
 strip_trailing_space() {
      printf "%s" "${1%"${1##*[![:space:]]}"}"
+}
+
+filter_printable() {
+     # redir of stderr as Mac's sed might throw an error
+     sed -i 's/[^[:print:]]//g' $1 2>/dev/null
 }
 
 is_number() {
@@ -904,8 +910,8 @@ strip_quote() (
      )"
 )
 
-# Converts a string containing PEM encoded data to one line.
 pem_to_one_line() {
+     # Converts a string containing PEM encoded data to one line.
      local pem="$1"
      local header="" footer=""
 
@@ -2570,18 +2576,20 @@ connectivity_problem() {
      fi
 }
 
+
 sanitze_http_header() {
-     # sed implementations tested were sometime not fine with header containing x0d x0a (CRLF) which is the usual
-     # case. Also we use tr here to remove any crtl chars which the server side offers --> possible security problem
-     # Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- but not under MacOS.
-     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $HEADERFILE | tr -d '\000-\011\013\014\016-\037' >$HEADERFILE.tmp
-     # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end
-     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $HEADERFILE.tmp >$HEADERFILE
-     debugme echo -e "---\n $(< $HEADERFILE) \n---"
+     # sp,e sed implementations tested were sometime not fine with HTTP headers containing x0d x0a (CRLF) which is
+     # usuallly the case. Also we use tr here to remove any crtl chars which the server side offers --> possible
+     # security problem. Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- not under MacOS.
+     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $1 | tr -d '\000-\011\013\014\016-\037' >$1.tmp
+     # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end (HTTP body)
+     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $1.tmp >$1
+     debugme echo -e "---\n $(< $1) \n---"
 }
 
 
 #problems not handled: chunked
+#
 run_http_header() {
      local header
      local referer useragent
@@ -2611,9 +2619,9 @@ run_http_header() {
           tm_out "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$OPTIMAL_PROTO $BUGS -quiet -ign_eof -connect $NODEIP:$PORT $PROXY $SNI") >$HEADERFILE 2>$ERRFILE
           NOW_TIME=$(date "+%s")
           HAD_SLEPT=0
-          sanitze_http_header
+          sanitze_http_header $HEADERFILE
      else
-          sanitze_http_header
+          sanitze_http_header $HEADERFILE
           # 1st GET request hung and needed to be killed. Check whether it succeeded anyway:
           if grep -Eiaq "XML|HTML|DOCTYPE|HTTP|Connection" $HEADERFILE; then
                # correct by seconds we slept, HAD_SLEPT comes from wait_kill()
@@ -6216,6 +6224,7 @@ sub_quic() {
      local alpn=""
      local use_openssl=""
      local proxy_hint_str=""
+     local ret=""
      local sclient_outfile="$TEMPDIR/$NODEIP.quic_connect.txt"
      local sclient_errfile="$TEMPDIR/$NODEIP.quic_connect_err.txt"
      local jsonID="QUIC"
@@ -6226,7 +6235,7 @@ sub_quic() {
      pr_bold " QUIC       ";
 
      if "$HAS2_QUIC" || "$HAS_QUIC"; then
-          # Proxying QUIC is not supported
+          # Proxying QUIC seems not supported
           # The s_client call would block if either the remote side doesn't support QUIC or outbound traffic is blocked
           if "$HAS2_QUIC"; then
                use_openssl="$OPENSSL2"
@@ -6236,18 +6245,30 @@ sub_quic() {
           OPENSSL_CONF='' $use_openssl s_client -quic -alpn h3 -connect $NODEIP:$PORT -servername $NODE </dev/null \
                2>$sclient_errfile  >$sclient_outfile &
           wait_kill $! $QUIC_WAIT
-          if [[ $? -ne 0 ]]; then
+          ret=$?
+          if [[ $ret -eq 3 ]]; then
+               # process was killed
                if [[ -n "$PROXY" ]]; then
-                    proxy_hint_str="(tried directly, is not proxyable): "
+                    proxy_hint_str="(QUIC is not proxyable, tried directly): "
                fi
                outln "${proxy_hint_str}not offered or timed out"
                fileout "$jsonID" "INFO" "$proxy_hint_str not offered"
           else
-               pr_svrty_best "offered (OK)"
-               fileout "$jsonID" "OK" "offered"
-               alpn="$(awk -F':' '/^ALPN protocol/ { print $2 }' < $sclient_outfile)"
-               alpn="$(strip_spaces $alpn)"
-               outln ": $(awk '/^Protocol:/ { print $2 }'  < $sclient_outfile) ($alpn)"
+               # 0 would be process terminated before be killed. Now findout what happened...
+               filter_printable $sclient_outfile
+               if [[ $(< $sclient_outfile) =~ CERTIFICATE----- ]]; then
+                    pr_svrty_best "offered (OK)"
+                    fileout "$jsonID" "OK" "offered"
+                    alpn="$(awk -F':' '/^ALPN protocol/ { print $2 }' < $sclient_outfile)"
+                    alpn="$(strip_spaces $alpn)"
+                    outln ": $(awk '/^Protocol:/ { print $2 }' 2>/dev/null  < $sclient_outfile) ($alpn)"
+               elif [[ $(< $sclient_outfile) =~ ^CONNECTED\( ]]; then
+                    outln "not offered (but UDP connection succeeded)"
+                    fileout "$jsonID" "INFO" "not offered (but UDP connection succeeded)"
+               else
+                    outln "not offered"
+                    fileout "$jsonID" "INFO" "not offered"
+               fi
           fi
      else
           prln_local_problem "No OpenSSL QUIC support"
