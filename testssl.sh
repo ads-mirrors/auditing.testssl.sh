@@ -2578,9 +2578,10 @@ connectivity_problem() {
 
 
 sanitze_http_header() {
-     # sp,e sed implementations tested were sometime not fine with HTTP headers containing x0d x0a (CRLF) which is
-     # usuallly the case. Also we use tr here to remove any crtl chars which the server side offers --> possible
-     # security problem. Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- not under MacOS.
+     # some sed implementations were sometime not fine with HTTP headers containing x0d x0a (CRLF: usual case)
+     # Also we use tr here to remove any crtl chars which the server side offers --> possible security problem.
+     # Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- not under MacOS.
+
      sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $1 | tr -d '\000-\011\013\014\016-\037' >$1.tmp
      # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end (HTTP body)
      sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $1.tmp >$1
@@ -2588,7 +2589,7 @@ sanitze_http_header() {
 }
 
 
-#problems not handled: chunked
+# problems not handled: chunked
 #
 run_http_header() {
      local header
