@@ -6255,7 +6255,7 @@ sub_quic() {
                outln "${proxy_hint_str}not offered or timed out"
                fileout "$jsonID" "INFO" "$proxy_hint_str not offered"
           else
-               # 0 would be process terminated before be killed. Now findout what happened...
+               # 0 would be process terminated before be killed. Now find out what happened...
                filter_printable $sclient_outfile
                if [[ $(< $sclient_outfile) =~ CERTIFICATE----- ]]; then
                     pr_svrty_best "offered (OK)"
