@@ -10,16 +10,16 @@ use Text::Diff;
 
 my $tests = 0;
 my $prg="./testssl.sh";
-my $uri="bahn.de";
+my $uri="github.com";
 my $out="";
 my $html="";
 my $debughtml="";
 my $edited_html="";
 my $htmlfile="tmp.html";
-#  need to avoid the debug message around L15190++ Your ./bin/openssl.Linux.x86_64 doesn't support X25519 :
-my $check2run="--ip=one --openssl /usr/bin/openssl --sneaky --ids-friendly --color 0 --htmlfile $htmlfile";
+# Pick /usr/bin/openssl as we want to avoid the debug messages like "Your ./bin/openssl.Linux.x86_64 doesn't support X25519"
+my $check2run="--ip=one -4 --openssl /usr/bin/openssl --sneaky --ids-friendly --color 0 --htmlfile $htmlfile";
 my $diff="";
-
+my $ip="";
 die "Unable to open $prg" unless -f $prg;
 
 printf "\n%s\n", "Doing HTML output checks";
@@ -57,7 +57,7 @@ $tests++;
 
 
 if ( $^O eq "darwin" ){
-     printf "\nskip debug checkon MacOS\n\n";
+     printf "\nskip debug check on MacOS\n\n";
      done_testing($tests);
      exit 0;
 }
@@ -87,7 +87,20 @@ $debughtml =~ s/.*DEBUG:.*\n//g;
 $debughtml =~ s/No engine or GOST support via engine with your.*\n//g;
 $debughtml =~ s/.*built: .*\n//g;
 $debughtml =~ s/.*Using bash .*\n//g;
+$debughtml =~ s/.*has_compression.*\n//g;
 # is whole line:   s/.*<pattern> .*\n//g;
+
+# Extract and mask IP address as it can change
+if ( $html =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/ ) {
+    $ip = $1;
+}
+$html =~ s/$ip/AAA.BBB.CCC.DDD/g;
+
+if ( $debughtml =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/ ) {
+    $ip = $1;
+}
+$debughtml =~ s/$ip/AAA.BBB.CCC.DDD/g;
+
 
 $diff = diff \$debughtml, \$html;
 
