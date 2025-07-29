@@ -2527,7 +2527,7 @@ service_detection() {
                     dns_https_rr
                fi
                pr_bold " Service detected"
-               out ":     $CORRECT_SPACES $SERVICE"
+               out ":      $CORRECT_SPACES $SERVICE"
                fileout "${jsonID}" "INFO" "$SERVICE"
                           ;;
           IMAP|POP|SMTP|NNTP|MongoDB)
@@ -22366,7 +22366,8 @@ get_caa_rrecord() {
 
 # Service Binding and Parameter Specification via the DNS (SVCB and HTTPS Resource Records).
 # https://www.rfc-editor.org/rfc/rfc9460.html
-# arg1: domain to check for
+#    arg1: domain to check for
+#    returns: string for record
 #
 get_https_rrecord() {
      local raw_https=""
@@ -22408,7 +22409,13 @@ get_https_rrecord() {
           text_httpsrr=$(nslookup -type=HTTPS $1 | awk '/'"^${1}"'.*rdata_65// { print substr($0,index($0,$4)) }')
      fi
 
+     if [[ -n "$text_httpsrr" ]]; then
+          safe_echo "$text_httpsrr"
+          return 0
+     fi
+
      # Now we need to try parsing the raw output
+     # Format probably: https://www.rfc-editor.org/rfc/rfc3597 (plus updates)
 
      # If there's a type65 record there are 2x3 output formats, mostly depending on age of distribution
      # -- roughly that's the difference between text and binary format -- and the type of DNS client
@@ -22425,38 +22432,28 @@ get_https_rrecord() {
      # 1) dev.testssl.sh	rdata_65 = 1 . alpn="h2"
      # 2) dev.testssl.sh	rdata_65 = \# 10 00010000010003026832
 
-     # we normalize the output during the following so that's e.g. 1 . alpn="h2"
-
-# https://datatracker.ietf.org/doc/rfc9460/?include_text=1
-
-#set -x
-     if [[ -n "$text_httpsrr" ]]; then
-          safe_echo "$text_httpsrr"
-     else
-          if "$HAS_DIG"; then
-               raw_https="$(dig $DIG_R +short +search +timeout=3 +tries=3 $noidnout type65 "$1" 2>/dev/null)"
-               # empty if there's no such record
-          elif "$HAS_DRILL"; then
-               raw_https="$(drill $1 type65 | grep -v '^;;' | awk '/'"^${1}"'.*TYPE65/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
-               # empty if there's no such record
-          elif "$HAS_HOST"; then
-               raw_https="$(host -t type65 $1)"
-               if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
-                    raw_https=""
-               else
-                    raw_https="${raw_https/$1 has HTTPS record /}"
-                    raw_https="${raw_https/$1 has TYPE65 record /}"
-               fi
-          elif "$HAS_NSLOOKUP"; then
-               raw_https="$(strip_lf "$(nslookup -type=type65 $1 | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
-               # empty if there's no such record
+     if "$HAS_DIG"; then
+          raw_https="$(dig $DIG_R +short +search +timeout=3 +tries=3 $noidnout type65 "$1" 2>/dev/null)"
+          # empty if there's no such record
+     elif "$HAS_DRILL"; then
+          raw_https="$(drill $1 type65 | grep -v '^;;' | awk '/'"^${1}"'.*TYPE65/ { print substr($0,index($0,$5)) }' )" # from 5th field onwards
+          # empty if there's no such record
+     elif "$HAS_HOST"; then
+          raw_https="$(host -t type65 $1)"
+          if [[ "$raw_https" =~ "has no HTTPS|has no TYPE65" ]]; then
+               raw_https=""
           else
-               return 1
-               # No dig, drill, host, or nslookup --> complaint was elsewhere already
+               raw_https="${raw_https/$1 has HTTPS record /}"
+               raw_https="${raw_https/$1 has TYPE65 record /}"
           fi
-          OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
-
-# Format probably: https://www.rfc-editor.org/rfc/rfc3597 (plus updates)
+     elif "$HAS_NSLOOKUP"; then
+          raw_https="$(strip_lf "$(nslookup -type=type65 $1 | awk '/'"^${1}"'.*rdata_65/ { print substr($0,index($0,$4)) }' )")"
+          # empty if there's no such record
+     else
+          return 1
+          # No dig, drill, host, or nslookup --> complaint was elsewhere already
+     fi
+     OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
 
 # dig +short +search +timeout=3 +tries=3 +noidnout type65 dev.testssl.sh
 # 1 . alpn="h2" port=443 ipv6hint=2a01:238:4308:a920:1000:0:b:1337
@@ -22474,39 +22471,39 @@ get_https_rrecord() {
 # 733A7CFAAEA5E4DD9CA43D4C24199E330004000100010012636C6F75 64666C6172652D6563682E636F6D0000000600202606470030310000 00000000AC43CDE72606470030360000000000006815229A
 #                                                 | cloudflare-ech.com                |            IPv6#1                           #IPv6#2
 
-          if [[ -z "$raw_https" ]]; then
-               return 1
-          elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
-               while read hash len line ;do
-               #           \#  10  00010000010003026832
-                    if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.1
-                         svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probably not needed) type casting. 0 is alias
-                         if [[ ${line:8:2} != 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
-                              continue                                               # If the first element is not alpn, next iteration of loop will fail.
-                         fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
+     if [[ -z "$raw_https" ]]; then
+          return 1
+     elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
+          while read hash len line ;do
+          #           \#  10  00010000010003026832
+               if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.1
+                    svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probably not needed) type casting. 0 is alias
+                    if [[ ${line:8:2} != 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
+                         continue                                               # If the first element is not alpn, next iteration of loop will fail.
+                    fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
 
-                         xlen_https_property=${line:12:2}                            # length of alpn entries
-                         https_property_value=${line:16:4}
-                         https_property_name=$(hex2ascii $https_property_value)
-                         if [[ $xlen_https_property != 03 ]]; then                   # 06 would be another entry
-                              https_property_value=${line:22:4}                      #FIXME: we can't cope with three entries yet
-                              https_property_name="${https_property_name},$(hex2ascii $https_property_value)"
-                         fi
-                         echo $https_property_name
+                    xlen_https_property=${line:12:2}                            # length of alpn entries
+                    https_property_value=${line:16:4}
+                    https_property_name=$(hex2ascii $https_property_value)
+                    if [[ $xlen_https_property != 03 ]]; then                   # 06 would be another entry
+                         https_property_value=${line:22:4}                      #FIXME: we can't cope with three entries yet
+                         https_property_name="${https_property_name},$(hex2ascii $https_property_value)"
+                    fi
+                    echo $https_property_name
 
 #                         len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
 #                         line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
 #                         https_property_name="$(hex2ascii ${line:4:$len_https_property})"
 #                         https_property_value="$(hex2ascii "${line:$((4+len_https_property)):100}")"
-                    else
-                         outln "please report unknown HTTPS RR $line with flag @ $NODE"
-                         return 7
-                    fi
-               done <<< "$raw_https"
-          else
-               safe_echo "$raw_https"
-          fi
+               else
+                    out "please report unknown HTTPS RR $line with flag @ $NODE"
+                    return 7
+               fi
+          done <<< "$raw_https"
+     else
+          safe_echo "$raw_https"
      fi
+
 #set +x
 
      return 0
@@ -23343,7 +23340,7 @@ dns_https_rr () {
      else
           https_rr="$(get_https_rrecord $NODE)"
           if [[ -n "$https_rr" ]]; then
-               pr_svrty_good "yes" ; out " "
+               pr_svrty_good "yes" ; out ":  "
                prln_italic "$(out_row_aligned_max_width "$https_rr" "$indent                              " $TERM_WIDTH)"
                fileout "${jsonID}" "OK" "$https_rr"
           else
