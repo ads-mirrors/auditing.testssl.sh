@@ -204,7 +204,7 @@ MAX_SOCKET_FAIL=${MAX_SOCKET_FAIL:-2}   # If this many failures for TCP socket c
 MAX_OSSL_FAIL=${MAX_OSSL_FAIL:-2}       # If this many failures for s_client connects are reached we terminate
 MAX_STARTTLS_FAIL=${MAX_STARTTLS_FAIL:-2}   # max number of STARTTLS handshake failures in plaintext phase
 MAX_HEADER_FAIL=${MAX_HEADER_FAIL:-2}   # If this many failures for HTTP GET are encountered we don't try again to get the header
-MAX_WAITSOCK=${MAX_WAITSOCK:-10}        # waiting at max 10 seconds for socket reply. There shouldn't be any reason to change this.
+MAX_WAITSOCK=${MAX_WAITSOCK:-5}         # waiting at max 5 seconds for socket reply. There shouldn't be any reason to change this.
 QUIC_WAIT=${QUIC_WAIT:-3}               # QUIC is UDP. Thus we run the connect in the background. This is how long to wait
 CCS_MAX_WAITSOCK=${CCS_MAX_WAITSOCK:-5} # for the two CCS payload (each). There shouldn't be any reason to change this.
 HEARTBLEED_MAX_WAITSOCK=${HEARTBLEED_MAX_WAITSOCK:-8}      # for the heartbleed payload. There shouldn't be any reason to change this.
@@ -22376,24 +22376,26 @@ get_txt_record() {
 #  sets IPv6_OK if it works -- or not
 #
 shouldwedo_ipv6() {
-     local i=0
-
      "$do_ipv4_only" && return 0
-     while true; do
+     bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null &
+     wait_kill $! $MAX_WAITSOCK
+     if [[ $? -eq 3 ]]; then
+          # was killed, so this got stuck
+          IPv6_OK=false
+          "$do_ipv6_only" && connectivity_problem 1 1 "" "IPv6 connect got stuck when IPv6-only scan requested"
+          do_ipv6_only=false                # this ensures we have round brackets and we don't try IPv6 anymore
+     else
+          # we're trying in the foreground again, only to get the return code
           bash -c "exec 5<>/dev/tcp/$1/$PORT" &>/dev/null
           if [[ $? -eq 0 ]]; then
                IPv6_OK=true
-               break
-          fi
-          sleep 1
-          ((i++))
-          [[ $i -ge $MAX_SOCKET_FAIL ]] && break
-     done
-     if ! "$IPv6_OK"; then
-          if "$do_ipv6_only"; then
-               connectivity_problem $i $MAX_SOCKET_FAIL "IPv6 connect problem" "repeated IPv6 connect problems when IPv6-only scan requested"
           else
                IPv6_OK=false
+               if "$do_ipv6_only"; then
+                    connectivity_problem 2 2 $MAX_SOCKET_FAIL "" "repeated IPv6 connect problems when IPv6-only scan requested"
+               else
+                    do_ipv6_only=false       #FIXME: wrong variable. It ensures we have round brackets enclosing IPv6 addresses + we don't try it anymore
+               fi
           fi
      fi
 }
