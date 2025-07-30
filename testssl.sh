@@ -22372,9 +22372,9 @@ get_caa_rrecord() {
 get_https_rrecord() {
      local raw_https=""
      local hash len line
-     local -i len_https_property
-     local https_property_name
-     local https_property_value
+     local -i len_alpnID
+     local alpnID
+     local alpnID_wire
      local saved_openssl_conf="$OPENSSL_CONF"
      local all_https=""
      local noidnout=""
@@ -22482,32 +22482,31 @@ get_https_rrecord() {
                     if [[ $svc_priority == 1 ]]; then
                          # mock text representation
                          svc_priority="$svc_priority . "
-                         https_property_name="${https_property_name}${svc_priority}"
+                         alpnID="${alpnID}${svc_priority}"
                     fi
-                    if [[ ${line:8:2} == 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
-                          https_property_name="${https_property_name}alpn=\""
+                    if [[ ${line:8:2} == 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=1
+                          alpnID="${alpnID}alpn=\""                             # double quote for clear text
                     else
                          continue                                               # If the 1st element is not alpn, next iteration of loop will fail.
                     fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
-                    xlen_https_property=${line:12:2}                            # length of alpn entries
-                    https_property_value=${line:16:4}                           # first value
-                    https_property_name=${https_property_name}$(hex2ascii $https_property_value)
-                    if [[ $xlen_https_property != 03 ]]; then                   # 06 would be another entry
-                         https_property_value=${line:22:4}                      #FIXME: we can't cope with three entries yet
-                         https_property_name="${https_property_name},$(hex2ascii $https_property_value)"
+                    len_alpnID=${line:12:2}                                     # length of alpn entries
+                    alpnID_wire=${line:16:4}                                    # value of first entry
+                    alpnID=${alpnID}$(hex2ascii $alpnID_wire)
+                    if [[ $len_alpnID != 03 ]]; then                            # 06 would be another entry
+                         alpnID_wire=${line:22:4}                               #FIXME: we can't cope with three entries yet
+                         alpnID="${alpnID},$(hex2ascii $alpnID_wire)"
                     fi
-                    [[ ${line:8:2} == 01 ]] && https_property_name="${https_property_name}\""  # if alpn add trailing double quote
+                    [[ ${line:8:2} == 01 ]] && alpnID="${alpnID}\""             # if alpn add trailing double quote
 
-#                         len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
-#                         line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
-#                         https_property_name="$(hex2ascii ${line:4:$len_https_property})"
-#                         https_property_value="$(hex2ascii "${line:$((4+len_https_property)):100}")"
+#                   len_alpnID=$((len_alpnID*2))                                # =>word! Now get name from 4th and value from 4th+len position...
+#                   alpnID="$(hex2ascii ${line:4:$len_alpnID})"
+#                   alpnID_wire="$(hex2ascii "${line:$((4+len_alpnID)):100}")"
                else
                     out "please report unknown HTTPS RR $line with flag @ $NODE"
                     return 7
                fi
           done <<< "$raw_https"
-         echo $https_property_name
+         safe_echo "$alpnID"
      fi
      return 0
 }
