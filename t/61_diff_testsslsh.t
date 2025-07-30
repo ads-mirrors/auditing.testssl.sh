@@ -63,10 +63,13 @@ $cat_csv      =~ s/AEAD-CHACHA20-POLY1305-SHA256/TLS_CHACHA20_POLY1305_SHA256/g;
 $cat_csv      =~ s/ECDH 253/ECDH 256/g;
 $baseline_csv =~ s/ECDH 253/ECDH 256/g;
 
-
 # this could contain the openssl path
 $cat_csv      =~ s/"engine_problem.*\n//g;
 $baseline_csv =~ s/"engine_problem.*\n//g;
+
+# QUIC gives different results on different platforms
+$cat_csv      =~ s/"QUIC.*\n//g;
+$baseline_csv =~ s/"QUIC.*\n//g;
 
 $diff = diff \$cat_csv, \$baseline_csv;
 
