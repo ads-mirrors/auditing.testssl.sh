@@ -22455,13 +22455,14 @@ get_https_rrecord() {
      fi
      OPENSSL_CONF="$saved_openssl_conf"      # see https://github.com/drwetter/testssl.sh/issues/134
 
-# dig +short +search +timeout=3 +tries=3 +noidnout type65 dev.testssl.sh
+# dig +short HTTPS dev.testssl.sh / dig +short type65 dev.testssl.sh
 # 1 . alpn="h2" port=443 ipv6hint=2a01:238:4308:a920:1000:0:b:1337
 #
 # 36 000100000100030268320003000201BB000600102A0102384308A920 10000000000B1337
 #         alpn|   L  h 2           443       2a010238...                               L=len
-
-# dig +short +search +timeout=3 +tries=3 +noidnout HTTPS testssl.net  (split over a couple of lines)
+#
+# -----------------
+# testssl.net  (split over a couple of lines)
 #
 # 1. alpn="h3,h2" ipv4hint=104.21.34.154,172.67.205.231
 # 136 00010000010006026833026832000400086815229AAC43CDE7000500 470045FE0D0041F3002000202BD0935ED66980C1862F2570C0D6014D
@@ -22476,20 +22477,26 @@ get_https_rrecord() {
      elif [[ "$raw_https" =~ \#\ [0-9][0-9] ]]; then
           while read hash len line ;do
           #           \#  10  00010000010003026832
-               if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.1
-                    svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, (probably not needed) type casting. 0 is alias
-                    if [[ ${line:8:2} != 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
-                         continue                                               # If the first element is not alpn, next iteration of loop will fail.
+               if [[ "${line:0:4}" == 0001 ]]; then                             # marker to proceed, belongs to SvcPriority, see rfc9460, 2.4.3
+                    svc_priority=$(printf "%0d" "$((10#${line:2:2}))")          # 1 is most often, 0 is alias
+                    if [[ $svc_priority == 1 ]]; then
+                         # mock text representation
+                         svc_priority="$svc_priority . "
+                         https_property_name="${https_property_name}${svc_priority}"
+                    fi
+                    if [[ ${line:8:2} == 01 ]]; then                            # Then comes SvcParamKeys, see rfc 14.3.2 which should be alpn=-1
+                          https_property_name="${https_property_name}alpn=\""
+                    else
+                         continue                                               # If the 1st element is not alpn, next iteration of loop will fail.
                     fi                                                          # Should we care as SvcParamKey!=alpn doesn't seems not very common?
-
                     xlen_https_property=${line:12:2}                            # length of alpn entries
-                    https_property_value=${line:16:4}
-                    https_property_name=$(hex2ascii $https_property_value)
+                    https_property_value=${line:16:4}                           # first value
+                    https_property_name=${https_property_name}$(hex2ascii $https_property_value)
                     if [[ $xlen_https_property != 03 ]]; then                   # 06 would be another entry
                          https_property_value=${line:22:4}                      #FIXME: we can't cope with three entries yet
                          https_property_name="${https_property_name},$(hex2ascii $https_property_value)"
                     fi
-                    echo $https_property_name
+                    [[ ${line:8:2} == 01 ]] && https_property_name="${https_property_name}\""  # if alpn add trailing double quote
 
 #                         len_https_property=$((len_https_property*2))                  # =>word! Now get name from 4th and value from 4th+len position...
 #                         line="${line/ /}"                                             # especially with iodefs there's a blank in the string which we just skip
@@ -22500,12 +22507,8 @@ get_https_rrecord() {
                     return 7
                fi
           done <<< "$raw_https"
-     else
-          safe_echo "$raw_https"
+         echo $https_property_name
      fi
-
-#set +x
-
      return 0
 }
 
