@@ -1,6 +1,6 @@
 ### FAQs
 
-This is a collection of frequently asked questions which should help to answer some of those or gain some insights. It could be helpful reading before filing issues.
+This is a collection of frequently asked questions which should help to answer some of those. It is is recommended reading this before filing issues.
 
 #### Coding
 
@@ -19,8 +19,7 @@ This is a collection of frequently asked questions which should help to answer s
 
 * Will you backport TLS 1.3, QUIC or some other modern crypto to the supplied OpenSSL-bad version?
   * That is not going to happen as it's more resource efficient use the vendor supplied version and compensate deficiencies with either the OpenSSL-bad version or with bash sockets as/where we see it fit.
-  * Also likely there won't be another set of compiled binaries --unless the sky falls on our head.
-
+  * Also likely there won't be another set of compiled binaries --unless the sky falls on our heads.
 
 * Where can I find infos about "your" OpenSSL version?
   * Source code, documentation and license see [here](https://github.com/testssl/openssl-1.0.2.bad). You may use it for testing. But don't use it in production on a server or as a client in any other context like testssl.sh!
