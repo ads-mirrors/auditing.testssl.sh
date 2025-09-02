@@ -69,7 +69,7 @@
 * CI run against a target with known configuration as a change canary
 * Updated client handshakes as new browsers and OpenSSL 3.5.x show KEMs
 * Start using client handshakes include ja3/ja4 so that similar handshakes will be recognized
-
+* Provide an FAQ
 
 ### Features implemented / improvements in 3.0
 
