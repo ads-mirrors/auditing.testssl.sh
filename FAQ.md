@@ -16,11 +16,11 @@ This is a collection of frequently asked questions which should help to answer s
 #### Rating / Grading
 
 * I am testing STARTTLS <PROTO\> and I get a poor grading/rating. Why is that??
-    * STARTTLS was originally not included in the SSLlabs grading/rating which otherwise we tried to adapt 1:1. The point is that STARTTLS speaks plaintext first and upon the client's request the server may upgrade the connection to TLS on the same port. That is inherently insecure for a number of reasons and** it should be avoided whenever possible** to avoid snooping or MitM attacks. This is the reaason why its labled as it is.
+    * STARTTLS was originally not included in the SSLlabs grading/rating which otherwise we tried to adapt 1:1. The point is that STARTTLS speaks plaintext first and upon the client's request the server may upgrade the connection to TLS on the same port. That is inherently insecure for a number of reasons and** it should be avoided whenever possible** to avoid snooping or MitM attacks. This is the reaason why its labeled as it is.
 * But there are standards like DNSSEC and MTA-STS which I implemented and you do not test for that!!
     * They provide a band aid, mostly, for SMTP port 25. For MTA-STS there is a PR pending. DNSSEC: we'll see. But still then we cannot label the server side as secure, as every client would need to test for that. Take this communication as an example: For SMTP and mail server to mail server communication it is still common to send e-mails to a mail server if the server certificate does not validate. Also if it validates properly we can tell whether all sending mail server does that. If we would label this as secure it would give you a false sense of security.
 * But what about e.g. IMAPS?
-    * Most of the clients probably do proper certificate validation nowadys. But still the upgrade form a plaintext connection is flawed and provides a can of worms of security problems, see e.g. [STARTTLS injection](https://nostarttls.secvuln.info/) and [Opossum](https://opossum-attack.com/). As the STARTTLS injection paper outlines: that bug dates back to 2011, when [Vietse Venema discovered a similar flaw](https://www.postfix.org/CVE-2011-0411.html). There is likely more to come.
+    * Most of the clients probably do proper certificate validation nowadays. But still the upgrade form a plaintext connection is flawed and provides a can of worms of security problems, see e.g. [STARTTLS injection](https://nostarttls.secvuln.info/) and [Opossum](https://opossum-attack.com/). As the STARTTLS injection paper outlines: that bug dates back to 2011, when [Vietse Venema discovered a similar flaw](https://www.postfix.org/CVE-2011-0411.html). There is likely more to come.
 
 
 
