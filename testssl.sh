@@ -2521,7 +2521,7 @@ sanitze_http_header() {
      sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $1 | tr -d '\000-\011\013\014\016-\037' >$1.tmp
      # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end
      sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $1.tmp >$1
-     debugme echo -e "---\n $(< $1E) \n---"
+     debugme echo -e "---\n $(< $1) \n---"
 }
 
 
