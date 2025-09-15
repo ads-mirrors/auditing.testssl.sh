@@ -2503,7 +2503,7 @@ service_detection() {
                wait_kill $! $((HEADER_MAXSLEEP * 10))
                was_killed=$?
           fi
-          # make sure that we don't have non-printable chars sneaked in -- relecant only in debug mode level 2
+          # make sure that we don't have non-printable chars sneaked in -- relevant only in debug mode level 2
           sanitze_http_header $TMPFILE
           head $TMPFILE | grep -aq '^HTTP/' && SERVICE=HTTP
           [[ -z "$SERVICE" ]] && head $TMPFILE | grep -Ewaq "SMTP|ESMTP|Exim|IdeaSmtpServer|Kerio Connect|Postfix" && SERVICE=SMTP  # I know some overlap here
