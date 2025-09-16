@@ -19608,8 +19608,8 @@ run_lucky13() {
      fi
      if [[ $sclient_success -eq 0 ]]; then
           out "potentially "
-          pr_svrty_low "VULNERABLE"; out ", uses cipher block chaining (CBC) ciphers with TLS. Check patches"
-          fileout "$jsonID" "LOW" "potentially vulnerable, uses TLS CBC ciphers" "$cve" "$cwe" "$hint"
+          pr_svrty_low "VULNERABLE"; out ", uses obsolete cipher block chaining ciphers with TLS, see server prefs."
+          fileout "$jsonID" "LOW" "potentially vulnerable, uses obsolete TLS CBC ciphers" "$cve" "$cwe" "$hint"
           # the CBC padding which led to timing differences during MAC processing has been solved in openssl (https://www.openssl.org/news/secadv/20130205.txt)
           # and other software. However we can't tell with reasonable effort from the outside. Thus we still issue a warning and label it experimental
      else
