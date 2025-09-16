@@ -2435,6 +2435,8 @@ service_detection() {
                wait_kill $! $HEADER_MAXSLEEP
                was_killed=$?
           fi
+          # make sure that we don't have non-printable chars sneaked in -- relevant only in debug mode level 2
+          sanitze_http_header $TMPFILE
           head $TMPFILE | grep -aq '^HTTP/' && SERVICE=HTTP
           [[ -z "$SERVICE" ]] && head $TMPFILE | grep -Ewaq "SMTP|ESMTP|Exim|IdeaSmtpServer|Kerio Connect|Postfix" && SERVICE=SMTP  # I know some overlap here
           [[ -z "$SERVICE" ]] && head $TMPFILE | grep -Ewaq "POP|POP3|Gpop|OK Dovecot" && SERVICE=POP                               # I know some overlap here
@@ -2509,14 +2511,17 @@ connectivity_problem() {
      fi
 }
 
+# arg1: filename (global)
+# return: sanitzes arg1. output only when debugging
+#
 sanitze_http_header() {
      # sed implementations tested were sometime not fine with header containing x0d x0a (CRLF) which is the usual
      # case. Also we use tr here to remove any crtl chars which the server side offers --> possible security problem
      # Only allowed now is LF + CR. See #2337. awk, see above, doesn't seem to care -- but not under MacOS.
-     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $HEADERFILE | tr -d '\000-\011\013\014\016-\037' >$HEADERFILE.tmp
+     sed -e '/^$/q' -e '/^[^a-zA-Z_0-9]$/q' $1 | tr -d '\000-\011\013\014\016-\037' >$1.tmp
      # Now to be more sure we delete from '<' or '{' maybe with a leading blank until the end
-     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $HEADERFILE.tmp >$HEADERFILE
-     debugme echo -e "---\n $(< $HEADERFILE) \n---"
+     sed -e '/^ *<.*$/d' -e '/^ *{.*$/d' $1.tmp >$1
+     debugme echo -e "---\n $(< $1) \n---"
 }
 
 
@@ -2550,9 +2555,9 @@ run_http_header() {
           tm_out "$GET_REQ11" | $OPENSSL s_client $(s_client_options "$OPTIMAL_PROTO $BUGS -quiet -ign_eof -connect $NODEIP:$PORT $PROXY $SNI") >$HEADERFILE 2>$ERRFILE
           NOW_TIME=$(date "+%s")
           HAD_SLEPT=0
-          sanitze_http_header
+          sanitze_http_header $HEADERFILE
      else
-          sanitze_http_header
+          sanitze_http_header $HEADERFILE
           # 1st GET request hung and needed to be killed. Check whether it succeeded anyway:
           if grep -Eiaq "XML|HTML|DOCTYPE|HTTP|Connection" $HEADERFILE; then
                # correct by seconds we slept, HAD_SLEPT comes from wait_kill()
@@ -2565,6 +2570,7 @@ run_http_header() {
                ((NR_HEADER_FAIL++))
           fi
      fi
+
      HTTP_TIME=$(awk -F': ' '/^date:/ { print $2 }  /^Date:/ { print $2 }' $HEADERFILE)
      HTTP_AGE=$(awk -F': ' '/^[aA][gG][eE]: / { print $2 }' $HEADERFILE)
      if [[ ! -s $HEADERFILE ]]; then
@@ -2592,6 +2598,10 @@ run_http_header() {
      # Populate vars for HTTP time
      [[ -n "$HTTP_AGE" ]] && HTTP_AGE="$(strip_lf "$HTTP_AGE")"
      [[ -n "$HTTP_TIME" ]] && HTTP_TIME="$(strip_lf "$HTTP_TIME")"
+     if [[ -n "$HTTP_AGE" ]] && [[ ! "$HTTP_AGE" =~ ^[0-9]+$ ]];  then
+          HTTP_AGE="NaN"
+     fi
+
      debugme echo "NOW_TIME: $NOW_TIME | HTTP_AGE: $HTTP_AGE | HTTP_TIME: $HTTP_TIME"
 
      HTTP_STATUS_CODE=$(awk '/^HTTP\// { print $2 }' $HEADERFILE 2>>$ERRFILE)
@@ -2722,13 +2732,20 @@ run_http_date() {
                outln
                pr_bold " HTTP Age"
                out " (RFC 7234)          $HTTP_AGE"
-               fileout "HTTP_headerAge" "INFO" "$HTTP_AGE seconds"
+               if [[ "$HTTP_AGE" = NaN ]]; then
+                    out ", "
+                    # https://www.rfc-editor.org/rfc/rfc7234#section-1.2.1
+                    pr_svrty_low "RFC 7234, sec 1.2.1. requires numbers"
+                    fileout "HTTP_headerAge" "LOW" "$HTTP_AGE was not a non-negative integer, see RFC 7234, sec 1.2.1."
+               else
+                    fileout "HTTP_headerAge" "INFO" "$HTTP_AGE seconds"
+               fi
           fi
      else
           out "Got no HTTP time, maybe try different URL?";
           fileout "$jsonID" "INFO" "Got no HTTP time, maybe try different URL?"
      fi
-     debugme tm_out ", HTTP_TIME + HTTP_AGE in epoch: $HTTP_TIME / $HTTP_AGE"
+     debugme tm_out ", HTTP_TIME | HTTP_AGE: $HTTP_TIME | $HTTP_AGE"
      outln
      match_ipv4_httpheader "$1"
      return 0
