@@ -1443,6 +1443,7 @@ fileout() {
 
 
 json_header() {
+     local fname_date="$1"
      local fname_prefix
      local filename_provided=false
 
@@ -1471,9 +1472,9 @@ json_header() {
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
      if [[ -z "$JSONFILE" ]]; then
-          JSONFILE="$fname_prefix-$(date +"%Y%m%d-%H%M".json)"
+          JSONFILE="$fname_prefix-${fname_date}.json"
      elif [[ -d "$JSONFILE" ]]; then
-          JSONFILE="$JSONFILE/${fname_prefix}-$(date +"%Y%m%d-%H%M".json)"
+          JSONFILE="$JSONFILE/${fname_prefix}-${fname_date}.json"
      fi
      # Silently reset APPEND var if the file doesn't exist as otherwise it won't be created
      if "$APPEND" && [[ ! -s "$JSONFILE" ]]; then
@@ -1494,6 +1495,7 @@ json_header() {
 
 
 csv_header() {
+     local fname_date="$1"
      local fname_prefix
      local filename_provided=false
 
@@ -1519,9 +1521,9 @@ csv_header() {
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
      if [[ -z "$CSVFILE" ]]; then
-          CSVFILE="${fname_prefix}-$(date +"%Y%m%d-%H%M".csv)"
+          CSVFILE="${fname_prefix}-${fname_date}.csv"
      elif [[ -d "$CSVFILE" ]]; then
-          CSVFILE="$CSVFILE/${fname_prefix}-$(date +"%Y%m%d-%H%M".csv)"
+          CSVFILE="$CSVFILE/${fname_prefix}-${fname_date}.csv"
      fi
      # Silently reset APPEND var if the file doesn't exist as otherwise it won't be created
      if "$APPEND" && [[ ! -s "$CSVFILE" ]]; then
@@ -1548,6 +1550,7 @@ csv_header() {
 ################# END JSON file functions. START HTML functions ####################
 
 html_header() {
+     local fname_date="$1"
      local fname_prefix
      local filename_provided=false
 
@@ -1576,9 +1579,9 @@ html_header() {
           fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
      fi
      if [[ -z "$HTMLFILE" ]]; then
-          HTMLFILE="$fname_prefix-$(date +"%Y%m%d-%H%M".html)"
+          HTMLFILE="$fname_prefix-${fname_date}.html"
      elif [[ -d "$HTMLFILE" ]]; then
-          HTMLFILE="$HTMLFILE/$fname_prefix-$(date +"%Y%m%d-%H%M".html)"
+          HTMLFILE="$HTMLFILE/$fname_prefix-${fname_date}.html"
      fi
      # Silently reset APPEND var if the file doesn't exist as otherwise it won't be created
      if "$APPEND" && [[ ! -s "$HTMLFILE" ]]; then
@@ -1626,8 +1629,9 @@ html_footer() {
 ################# END HTML file functions ####################
 
 prepare_logging() {
-     # arg1: for testing mx records name we put a name of logfile in here, otherwise we get strange file names
-     local fname_prefix="$1"
+     local fname_date="$1"
+     # arg2: for testing mx records name we put a name of logfile in here, otherwise we get strange file names
+     local fname_prefix="$2"
      local filename_provided=false
 
      if [[ -n "$PARENT_LOGFILE" ]]; then
@@ -1644,10 +1648,10 @@ prepare_logging() {
      [[ -z "$fname_prefix" ]] && fname_prefix="${FNAME_PREFIX}${NODE}_p${PORT}"
 
      if [[ -z "$LOGFILE" ]]; then
-          LOGFILE="$fname_prefix-$(date +"%Y%m%d-%H%M".log)"
+          LOGFILE="$fname_prefix-${fname_date}.log"
      elif [[ -d "$LOGFILE" ]]; then
           # actually we were instructed to place all files in a DIR instead of the current working dir
-          LOGFILE="$LOGFILE/$fname_prefix-$(date +"%Y%m%d-%H%M".log)"
+          LOGFILE="$LOGFILE/$fname_prefix-${fname_date}.log"
      else
           : # just for clarity: a log file was specified, no need to do anything else
      fi
@@ -23098,6 +23102,7 @@ draw_line() {
 
 
 run_mx_all_ips() {
+     local fname_date="$1"
      local mxs mx
      local mxport
      local -i ret=0
@@ -23105,18 +23110,18 @@ run_mx_all_ips() {
 
      STARTTLS_PROTOCOL="smtp"
      # test first higher priority servers
-     mxs=$(get_mx_record "$1" | sort -n | sed -e 's/^.* //' -e 's/\.$//' | tr '\n' ' ')
+     mxs=$(get_mx_record "$2" | sort -n | sed -e 's/^.* //' -e 's/\.$//' | tr '\n' ' ')
      if [[ $CMDLINE_IP == one ]]; then
           word="as instructed one"                               # with highest priority
           mxs=${mxs%% *}
      else
           word="the only"
      fi
-     mxport=${2:-25}
+     mxport=${3:-25}
      if [[ -n "$LOGFILE" ]] || [[ -n "$PARENT_LOGFILE" ]]; then
-          prepare_logging
+          prepare_logging "${fname_date}"
      else
-          prepare_logging "${FNAME_PREFIX}mx-$1"
+          prepare_logging "${fname_date}" "${FNAME_PREFIX}mx-$1"
      fi
      if [[ -n "$mxs" ]] && [[ "$mxs" != ' ' ]]; then
           [[ $(count_words "$mxs") -gt 1 ]] && MULTIPLE_CHECKS=true
@@ -24990,22 +24995,23 @@ lets_roll() {
 ################# main #################
 
 
-     RET=0     # this is a global as we can have a function main(), see #705. Should we toss then all local $ret?
-     ip=""
+     RET=0                                   # this is a global as a function main() is problematic, see #705. Should we toss then all local $ret?
      stopwatch start
+     FNAME_DATE="$(date +"%Y%m%d-%H%M")"     # a global var, and a definition via local doesn't work here. Omitting definition above
+     IP=""                                   # see previous line, global used only here
 
      lets_roll init
      initialize_globals
-     check_base_requirements            # needs to come after $do_html is defined
+     check_base_requirements                 # needs to come after $do_html is defined
      parse_cmd_line "$@"
      # CMDLINE_PARSED has been set now. Don't put a function immediately after this which calls fatal().
      # Rather put it after csv_header below.
      # html_header() needs to be called early! Otherwise if html_out() is called before html_header() and the
      # command line contains --htmlfile <htmlfile> or --html, it'll make problems with html output, see #692.
      # json_header and csv_header could be called later but for context reasons we'll leave it here
-     html_header
-     json_header
-     csv_header
+     html_header "${FNAME_DATE}"
+     json_header "${FNAME_DATE}"
+     csv_header "${FNAME_DATE}"
      get_install_dir
      # see #705, we need to source TLS_DATA_FILE here instead of in get_install_dir(), see #705
      [[ -r "$TLS_DATA_FILE" ]] && . "$TLS_DATA_FILE"
@@ -25030,7 +25036,7 @@ lets_roll() {
      fileout_banner
 
      if "$do_mass_testing"; then
-          prepare_logging
+          prepare_logging "${FNAME_DATE}"
           if [[ "$MASS_TESTING_MODE" == parallel ]]; then
                run_mass_testing_parallel
           else
@@ -25043,13 +25049,13 @@ lets_roll() {
      #TODO: there shouldn't be the need for a special case for --mx, only the ip addresses we would need upfront and the do-parser
      if "$do_mx_all_ips"; then
           #FIXME: do we need this really here?
-          count_do_variables                           # if we have just 1x "do_*" --> we do a standard run -- otherwise just the one specified
+          count_do_variables                                # if we have just 1x "do_*" --> we do a standard run -- otherwise just the one specified
           [[ $? -eq 1 ]] && set_scanning_defaults
-          run_mx_all_ips "${URI}" $PORT                # we should reduce run_mx_all_ips to what's necessary as below we have similar code
+          run_mx_all_ips "${FNAME_DATE}" "${URI}" $PORT     # we should reduce run_mx_all_ips to what's necessary as below we have similar code
           exit $?
      fi
 
-     [[ -z "$NODE" ]] && parse_hn_port "${URI}"        # NODE, URL_PATH, PORT, IPADDRs and IP46ADDR is set now
+     [[ -z "$NODE" ]] && parse_hn_port "${URI}"             # NODE, URL_PATH, PORT, IPADDRs and IP46ADDR is set now
      prepare_logging
 
      if [[ -n "$PROXY" ]] && $DNS_VIA_PROXY; then
@@ -25066,10 +25072,10 @@ lets_roll() {
                     pr_bold "Testing all IPv4 addresses (port $PORT): "
                fi
                outln "$IPADDRs"
-               for ip in $IPADDRs; do
+               for IP in $IPADDRs; do
                     draw_line "-" $((TERM_WIDTH * 2 / 3))
                     outln
-                    NODEIP="$ip"
+                    NODEIP="$IP"
                     lets_roll "${STARTTLS_PROTOCOL}"
                     RET=$((RET + $?))                       # RET value per IP address
                done
