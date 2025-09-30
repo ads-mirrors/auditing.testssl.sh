@@ -25329,7 +25329,7 @@ lets_roll() {
      RET=0                                   # this is a global as a function main() is problematic, see #705. Should we toss then all local $ret?
      IP=""                                   # global used only here
      stopwatch start
-     FNAME_DATE="$(date +"%Y%m%d-%H%M")"     # a global var, and a definition via local doesn't work here. Omiting definition above
+     FNAME_DATE="$(date +"%Y%m%d-%H%M")"     # a global var, and a definition via local doesn't work here. Omitting definition above
 
      lets_roll init
      initialize_globals
