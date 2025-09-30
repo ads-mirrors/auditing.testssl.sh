@@ -25326,23 +25326,23 @@ lets_roll() {
 ################# main #################
 
 
-     RET=0     # this is a global as we can have a function main(), see #705. Should we toss then all local $ret?
-     ip=""
+     RET=0                                   # this is a global as a function main() is problematic, see #705. Should we toss then all local $ret?
+     IP=""                                   # global used only here
      stopwatch start
-     local fname_date="$(date +"%Y%m%d-%H%M")"
+     FNAME_DATE="$(date +"%Y%m%d-%H%M")"     # a global var, and a definition via local doesn't work here. Omiting definition above
 
      lets_roll init
      initialize_globals
-     check_base_requirements            # needs to come after $do_html is defined
+     check_base_requirements                 # needs to come after $do_html is defined
      parse_cmd_line "$@"
      # CMDLINE_PARSED has been set now. Don't put a function immediately after this which calls fatal().
      # Rather put it after csv_header below.
      # html_header() needs to be called early! Otherwise if html_out() is called before html_header() and the
      # command line contains --htmlfile <htmlfile> or --html, it'll make problems with html output, see #692.
      # json_header and csv_header could be called later but for context reasons we'll leave it here
-     html_header "${fname_date}"
-     json_header "${fname_date}"
-     csv_header "${fname_date}"
+     html_header "${FNAME_DATE}"
+     json_header "${FNAME_DATE}"
+     csv_header "${FNAME_DATE}"
      get_install_dir
      # see #705, we need to source TLS_DATA_FILE here instead of in get_install_dir(), see #705
      [[ -r "$TLS_DATA_FILE" ]] && . "$TLS_DATA_FILE"
@@ -25367,7 +25367,7 @@ lets_roll() {
      fileout_banner
 
      if "$do_mass_testing"; then
-          prepare_logging "${fname_date}"
+          prepare_logging "${FNAME_DATE}"
           if [[ "$MASS_TESTING_MODE" == parallel ]]; then
                run_mass_testing_parallel
           else
@@ -25382,12 +25382,12 @@ lets_roll() {
           #FIXME: do we need this really here?
           count_do_variables                           # if we have just 1x "do_*" --> we do a standard run -- otherwise just the one specified
           [[ $? -eq 1 ]] && set_scanning_defaults
-          run_mx_all_ips "${fname_date}" "${URI}" $PORT                # we should reduce run_mx_all_ips to what's necessary as below we have similar code
+          run_mx_all_ips "${FNAME_DATE}" "${URI}" $PORT                # we should reduce run_mx_all_ips to what's necessary as below we have similar code
           exit $?
      fi
 
      [[ -z "$NODE" ]] && parse_hn_port "${URI}"        # NODE, URL_PATH, PORT, IPADDRs2CHECK and IPADDRs2SHOW is set now
-     prepare_logging "${fname_date}"
+     prepare_logging "${FNAME_DATE}"
 
      if [[ -n "$PROXY" ]] && $DNS_VIA_PROXY; then
           NODEIP="$NODE"
@@ -25406,10 +25406,10 @@ lets_roll() {
                pr_bold "Testing all IP addresses (port $PORT): "
           fi
           outln "$IPADDRs2CHECK"
-          for ip in $IPADDRs2CHECK; do
+          for IP in $IPADDRs2CHECK; do
                draw_line "-" $((TERM_WIDTH * 2 / 3))
                outln
-               NODEIP="$ip"
+               NODEIP="$IP"
                lets_roll "${STARTTLS_PROTOCOL}"
                RET=$((RET + $?))                       # RET value per IP address
           done
