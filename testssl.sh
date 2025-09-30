@@ -4416,6 +4416,7 @@ run_allciphers() {
 # test for all ciphers per protocol locally configured (w/o distinguishing whether they are good or bad)
 # for the specified protocol, test for all ciphers locally configured (w/o distinguishing whether they
 # are good or bad) and list them in order to encryption strength.
+#
 ciphers_by_strength() {
      local proto="$1" proto_hex="$2" proto_text="$3"
      local using_sockets="$4" wide="$5" serverpref_known="$6"
@@ -4841,7 +4842,7 @@ run_cipher_per_proto() {
      while read proto proto_hex proto_text; do
           pr_underline "$(printf -- "%b" "$proto_text")"
           ciphers_by_strength "$proto" "$proto_hex" "$proto_text" "$using_sockets" "true" "false"
-     done <<< "$(tm_out " -ssl2 22 SSLv2\n -ssl3 00 SSLv3\n -tls1 01 TLS 1\n -tls1_1 02 TLS 1.1\n -tls1_2 03 TLS 1.2\n -tls1_3 04 TLS 1.3")"
+     done <<< "$(tm_out " -ssl2 22 SSLv2\n -ssl3 00 SSLv3\n -tls1 01 TLSv1\n -tls1_1 02 TLSv1.1\n -tls1_2 03 TLSv1.2\n -tls1_3 04 TLSv1.3")"
      return 0
 #FIXME: no error condition
 }
@@ -4860,6 +4861,7 @@ run_cipher_per_proto() {
 # then either:
 #  1) replace it with one corresponding to $SNI; or
 #  2) remove it, if $SNI is empty
+#
 modify_clienthello() {
      local tls_handshake_ascii="$1"
      local new_key_share="$2" cookie="$3"
@@ -7188,7 +7190,7 @@ run_server_preference() {
      if "$TLS13_ONLY" && ! "$has_tls13_cipher_order"; then
           terminal_msg="no (TLS 1.3 only)"
           limitedsense=" (limited sense as client will pick)"
-          fileout_msg="not a cipher order for TLS 1.3 configured"
+          fileout_msg="not a server cipher order for TLS 1.3 configured"
      elif ! "$TLS13_ONLY" && [[ -z "$cipher2" ]]; then
           pr_warning "unable to determine"
      elif ! "$has_cipher_order" && ! "$has_tls13_cipher_order"; then
@@ -7196,7 +7198,7 @@ run_server_preference() {
           terminal_msg="no (NOT ok)"
           [[ "$fileout_rating" == INFO ]] && terminal_msg="no"
           limitedsense=" (limited sense as client will pick)"
-          fileout_msg="NOT a cipher order configured"
+          fileout_msg="NOT a server cipher order configured"
      elif "$has_cipher_order" && ! "$has_tls13_cipher_order" && [[ "$default_proto" == TLSv1.3 ]]; then
           if [[ $NO_CIPHER_ORDER_LEVEL -eq 5 ]]; then
                pr_svrty_good "yes (OK)"; out " -- only for < TLS 1.3"
@@ -7271,6 +7273,7 @@ run_server_preference() {
 }
 
 # arg1: true if the list that is returned does not need to be ordered by preference.
+#
 check_tls12_pref() {
      local unordered_list_ok="$1"
      local chacha20_ciphers="" non_chacha20_ciphers=""
@@ -7366,6 +7369,7 @@ check_tls12_pref() {
 }
 
 # At the moment only called from run_server_preference()
+#
 cipher_pref_check() {
      local proto="$1" proto_hex="$2" proto_text="$3"
      local using_sockets="$4"
